@@ -6,6 +6,7 @@ import path from "node:path";
 
 // https://vite.dev/config/
 export default defineConfig({
+base: "/Playtest64/",
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
