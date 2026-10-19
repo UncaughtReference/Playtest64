@@ -22,7 +22,7 @@ export default function App() {
 				<Separator className="mt-2 mb-2"/>
 
 			  	<TabsContent value="browse">
-					<div className="grid grid-cols-3 gap-4">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 						<Hack></Hack>
 					</div>
 			  	</TabsContent>
@@ -56,7 +56,7 @@ function Hack() {
 			<CardDescription>Luigi's new adventure!</CardDescription>
 		  </CardHeader>
 		  <CardContent>
-			<img src="/assets/totzd.jpg" className="w-full h-auto rounded-md"/>	
+			<img src={`${import.meta.env.BASE_URL}assets/totzd.jpg`} className="w-full h-auto rounded-md"/>	
 		  </CardContent>
 		  <CardFooter>
 			<p>ZennyTheZtarBones</p>
