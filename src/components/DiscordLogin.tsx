@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 
 import { LogOut } from "lucide-react"
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export default function DiscordLogin() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,9 @@ export default function DiscordLogin() {
     "Discord user";
   const avatar = metadata.avatar_url ?? metadata.picture;
 
+    const { appUser, isModerator, roleLoading } = useAuth();
+    const role = isModerator ? (<span className='text-green-500 font-bold'>Moderator</span>) : (<strong>User</strong>);
+
   return (
     <div className="space-y-3">
       {avatar && (
@@ -82,7 +87,8 @@ export default function DiscordLogin() {
           className="h-16 w-16 rounded-full"
         />
       )}
-      <p>Signed in as <strong>{displayName}</strong></p>
+      <p className="mb-0">Signed in as <strong>{displayName}</strong></p>
+      <p>Role: {role}</p>
       <Button variant="outline" onClick={logout}>
 	<LogOut />
         Log out
