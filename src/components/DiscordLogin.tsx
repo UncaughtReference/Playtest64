@@ -76,7 +76,10 @@ export default function DiscordLogin() {
   const avatar = metadata.avatar_url ?? metadata.picture;
 
     const { appUser, isModerator, roleLoading } = useAuth();
-    const role = isModerator ? (<span className='text-green-500 font-bold'>Moderator</span>) : (<strong>User</strong>);
+    const role = isModerator ? 
+        (<span className='text-green-500 font-bold'>Moderator</span>) : 
+        (<strong>User</strong>) ??
+        (<span className='text-yellow-500 font-bold'>Unsure</span>);
 
   return (
     <div className="space-y-3">
