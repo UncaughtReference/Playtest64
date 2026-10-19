@@ -75,8 +75,8 @@ export default function DiscordLogin() {
     "Discord user";
   const avatar = metadata.avatar_url ?? metadata.picture;
 
-    const { appUser, isModerator, roleLoading } = useAuth();
-    const role = isModerator ? 
+    const { roleLoading, isModerator } = useAuth(); 
+    const roleHtml = isModerator ? 
         (<span className='text-green-500 font-bold'>Moderator</span>) : 
         (<strong>User</strong>);
 
@@ -90,7 +90,7 @@ export default function DiscordLogin() {
         />
       )}
       <p className="mb-0">Signed in as <strong>{displayName}</strong></p>
-      <p>Role: {role}</p>
+      <p>Role: {roleLoading ? "Loading..." : roleHtml ?? "User"}</p>
       <Button variant="outline" onClick={logout}>
 	<LogOut />
         Log out

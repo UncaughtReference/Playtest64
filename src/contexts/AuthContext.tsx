@@ -1,4 +1,3 @@
-
 import {
   createContext,
   useContext,
@@ -12,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 type AuthContextType = {
   user: User | null;
   loading: boolean;
+  role: string | null;
   isModerator: boolean;
   roleLoading: boolean;
 };
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
      <AuthContext.Provider
-          value={{ user, loading, isModerator, roleLoading }}
+            value={{ user, loading, role, isModerator, roleLoading }}
         >
           {children}
         </AuthContext.Provider> 
