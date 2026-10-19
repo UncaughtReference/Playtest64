@@ -8,6 +8,9 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button"
+
+import { ArrowLeftIcon, Gamepad2 } from "lucide-react"
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -25,6 +28,7 @@ type ApprovedHack = {
   tags: string;
   difficulty: number;
   image: string;
+  slug: string;
 };
 
 export default function App() {
@@ -187,26 +191,41 @@ function HackPage() {
 
   return (
     <main className="animated-gradient min-h-screen">
-		<div className="mx-auto max-w-4xl p-4">
-		  <Link to="/" className="underline">
-			← Back
-		  </Link>
+		<div className="max-w-4xl p-4">
+			<Header></Header>
+			
+			<Separator className="mt-2 mb-2"/>
 
-		  <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
-		  <p className="mt-2">{hack.short_description}</p>
+		  	<Link to="/">
+			  	<Button variant="outline" aria-label="Back">
+					<ArrowLeftIcon />
+					Back
+			  	</Button>	
+		  	</Link>
 
-		  {imageUrl && (
-			<img
-			  src={imageUrl}
-			  alt={hack.name}
-			  className="mt-4 w-full rounded-lg"
-			/>
-		  )}
+			<div className="mx-auto">
+			  <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
+			  <p className="mt-2">{hack.short_description}</p>
+			  <p className="mt-2">Authors: {hack.authors}</p>
 
-		  <p className="mt-4">{hack.long_description}</p>
-		  <p className="mt-2">Authors: {hack.authors}</p>
-		  <p className="mt-2">Difficulty: {hack.difficulty}</p>
-		  <p className="mt-2">Tags: {hack.tags}</p>
+			  {imageUrl && (
+				<img
+				  src={imageUrl}
+				  alt={hack.name}
+				  className="mt-4 w-[400px] rounded-lg"
+				/>
+			  )}
+
+			  <p className="mt-4">{hack.long_description}</p>
+			  <p className="mt-2">Difficulty: {hack.difficulty}</p>
+			  <p className="mt-2">Tags: {hack.tags}</p>
+				
+				<Button variant="outline" className="mt-2">
+					<Gamepad2 />	
+					Apply
+				</Button>	
+
+			</div>
 	  </div>
     </main>
   );
