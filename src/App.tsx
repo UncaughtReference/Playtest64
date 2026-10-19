@@ -18,6 +18,8 @@ import { supabase } from "@/lib/supabase";
 import { Routes, Route } from "react-router-dom";
 import { useParams, Link } from "react-router-dom";
 
+import DiscordLogin from "@/components/DiscordLogin";
+
 type ApprovedHack = {
   id: number;
   created_at: string;
@@ -57,8 +59,8 @@ function Home() {
 						<ApprovedHacks></ApprovedHacks>
 					</div>
 			  	</TabsContent>
-			  <TabsContent value="account"></TabsContent>
-			</Tabs>
+			  <TabsContent value="account"><DiscordLogin /></TabsContent>
+		    </Tabs>
 		</div>
 	)
 }
