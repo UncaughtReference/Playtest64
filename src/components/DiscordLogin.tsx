@@ -90,7 +90,7 @@ export default function DiscordLogin() {
           className="h-16 w-16 rounded-full"
         />
       )}
-      <p className="mb-0">Signed in as <strong>{displayName}</strong></p>
+      <p className="mb-0">Signed34234234 in as <strong>{displayName}</strong></p>
       <p>Role: {role}</p>
       <Button variant="outline" onClick={logout}>
 	<LogOut />
