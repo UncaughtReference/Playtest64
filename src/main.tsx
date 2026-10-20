@@ -5,13 +5,26 @@ import "./index.css";
 
 import { AuthProvider } from "@/contexts/AuthContext";
 
-if (
+/*if (
     (window.location.pathname === "/Playtest64/" ||
         window.location.pathname === "/Playtest64") &&
     window.location.hash === "" &&
     !window.location.search
 ) {
     window.location.replace("/Playtest64/#/");
+}*/
+
+if (
+    (window.location.pathname === "/Playtest64/" ||
+        window.location.pathname === "/Playtest64") &&
+    window.location.hash === "" &&
+    !window.location.search
+) {
+    window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}#/${window.location.search}`
+    );
 }
 
 createRoot(document.getElementById("root")!).render(

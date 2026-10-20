@@ -24,6 +24,7 @@ import { Field, FieldGroup } from "@/components/ui/field"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 import { ArrowLeftIcon, Gamepad2, CirclePlus } from "lucide-react"
 
@@ -31,15 +32,22 @@ import { useEffect, useState, type FormEvent, type ChangeEvent  } from "react";
 import { supabase } from "@/lib/supabase";
 
 import { Routes, Route } from "react-router-dom";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 
 import DiscordLogin from "@/components/DiscordLogin";
 
 import Account from "@/pages/Account";
 import MyHacks from "@/pages/MyHacks";
 import Playtesters, { PlaytestersList } from "@/pages/Playtesters";
+import ModeratorHacks, { ModeratorHacksGrid } from "@/pages/ModeratorHacks";
+import ModeratorUsers, { ModeratorUsersList } from "@/pages/ModeratorUsers";
 
 import { useAuth } from "@/contexts/AuthContext";
+
+import {
+    getCachedApprovedHacks,
+    saveCachedApprovedHacks,
+} from "@/lib/approvedHacksCache";
 
 type ApprovedHack = {
   id: number;
@@ -70,6 +78,72 @@ type SubmitHackDialogProps = {
     onSubmitted?: () => void;
 };
 
+type ApprovedHackProps = {
+    hack: ApprovedHack;
+    onApprove?: () => void;
+    onDecline?: () => void;
+    actionLoading?: boolean;
+    showStatus?: boolean;
+};
+
+type MyHacksGridProps = {
+    refreshKey: number;
+};
+
+const myHacksCache = new Map<string, ApprovedHack[]>();
+
+function useBanStatus(userId: string | undefined) {
+    const [isBanned, setIsBanned] = useState<boolean | null>(null);
+    const [checkingBan, setCheckingBan] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function checkBan() {
+            setCheckingBan(true);
+            setIsBanned(null);
+
+            if (!userId) {
+                setIsBanned(false);
+                setCheckingBan(false);
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase.rpc(
+                    "is_current_user_banned"
+                );
+
+                if (error) {
+                    throw error;
+                }
+
+                if (!cancelled) {
+                    setIsBanned(data === true);
+                }
+            } catch (error) {
+                console.error("Could not check ban status:", error);
+
+                if (!cancelled) {
+                    setIsBanned(null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setCheckingBan(false);
+                }
+            }
+        }
+
+        void checkBan();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [userId]);
+
+    return { isBanned, checkingBan };
+}
+
 export default function App() {
   return (
     <Routes>
@@ -77,6 +151,8 @@ export default function App() {
       <Route path="/account" element={<Account />} />
       <Route path="/my-hacks" element={<MyHacks />} />
       <Route path="/playtesters" element={<Playtesters />} />
+      <Route path="/mod-hacks" element={<ModeratorHacks />} />
+      <Route path="/mod-users" element={<ModeratorUsers />} />
       <Route path="/:slug" element={<HackPage />} />
     </Routes>
   );
@@ -92,53 +168,179 @@ function Home() {
 }
 
 export function TabView({ defaultPage }: TabViewProps) {
-    return (<Tabs defaultValue={defaultPage} className="pt-2">
-			  	<TabsList>
-					<Link to="/"><TabsTrigger value="home">Home</TabsTrigger></Link>
-					<Link to="/account"><TabsTrigger value="account">Account</TabsTrigger></Link>
-                    <Link to="/my-hacks"><TabsTrigger value="my-hacks">My Hacks</TabsTrigger></Link>
-                    <Link to="/playtesters"><TabsTrigger value="playtesters">Playtesters</TabsTrigger></Link>
-			  	</TabsList>
-	
-				<Separator className="mt-2 mb-2"/>
+    const {
+        user,
+        loading,
+        isModerator,
+        roleLoading,
+        cachedIsModerator,
+    } = useAuth(); 
+    const location = useLocation();
 
-			  	<TabsContent value="home">
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-						<ApprovedHacks></ApprovedHacks>
-					</div>
-			  	</TabsContent>
-			  <TabsContent value="account"><DiscordLogin /></TabsContent>
-              <TabsContent value="my-hacks">
-                   <SubmitHackDialog
-        onSubmitted={() => {
-            // Refresh your hack list here, if necessary.
-        }}
-    /> 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-						<MyHacksGrid></MyHacksGrid>
-					</div>
-              </TabsContent>
+    const [hacksRefreshKey, setHacksRefreshKey] = useState(0);
 
-                <TabsContent value="playtesters">
-                    <PlaytestersList/> 
-                </TabsContent>
-		    </Tabs> )
+    const showModeratorTabs =
+    cachedIsModerator || (!roleLoading && isModerator);
+
+    const routeToTab: Record<string, string> = {
+        "/": "home",
+        "/account": "account",
+        "/my-hacks": "my-hacks",
+        "/playtesters": "playtesters",
+        "/mod-hacks": "mod-hacks",
+        "/mod-users": "mod-users",
+    };
+
+    const currentTab = routeToTab[location.pathname] ?? defaultPage;
+
+    useEffect(() => {
+        //if (loading || roleLoading) return;
+
+        if (
+            !user ||
+            (!isModerator &&
+                (location.pathname === "/mod-hacks" ||
+                    location.pathname === "/mod-users"))
+        ) {
+            // Don't redirect here; let your existing auth/routing logic decide.
+            return;
+        }
+    }, [
+        user,
+        loading,
+        roleLoading,
+        isModerator,
+        location.pathname,
+    ]);
+
+    return (
+        <Tabs value={currentTab} className="pt-2">
+            <TabsList>
+                <TabsTrigger value="home" >
+                    <Link to="/">Home</Link>
+                </TabsTrigger>
+
+                <TabsTrigger value="account" >
+                    <Link to="/account">Account</Link>
+                </TabsTrigger>
+
+                <TabsTrigger value="my-hacks" >
+                    <Link to="/my-hacks">My Hacks</Link>
+                </TabsTrigger>
+
+                <TabsTrigger value="playtesters" >
+                    <Link to="/playtesters">Playtesters</Link>
+                </TabsTrigger>
+
+                {showModeratorTabs && (
+                    <>
+                        <TabsTrigger value="mod-hacks" >
+                            <Link to="/mod-hacks">Mod: Hacks</Link>
+                        </TabsTrigger>
+
+                        <TabsTrigger value="mod-users" >
+                            <Link to="/mod-users">Mod: Users</Link>
+                        </TabsTrigger>
+                    </>
+                )}
+            </TabsList>
+
+            <Separator className="mt-2 mb-2" />
+
+            <TabsContent value="home">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <ApprovedHacks />
+                </div>
+            </TabsContent>
+
+            <TabsContent value="account">
+                <DiscordLogin />
+            </TabsContent>
+
+            <TabsContent value="my-hacks">
+                <SubmitHackDialog
+                    onSubmitted={() => {
+                        setHacksRefreshKey((previous) => previous + 1);
+                    }}
+                />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <MyHacksGrid refreshKey={hacksRefreshKey} />
+                </div>
+            </TabsContent> 
+
+            <TabsContent value="playtesters">
+                <PlaytestersList />
+            </TabsContent>
+
+            {showModeratorTabs && (
+                <>
+                    <TabsContent value="mod-hacks">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            <ModeratorHacksGrid />
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="mod-users">
+                        <div className="mx-auto mt-6 w-full max-w-5xl">
+                            <ModeratorUsersList />
+                        </div>
+                    </TabsContent>
+                </>
+            )}
+        </Tabs>
+    );
 }
 
 export function Header() {
 	return (
 		<header className="flex items-center justify-between">
-			<div className="flex flex-col gap-1">
-				<h1 className="text-2xl">Playtest64</h1>
+			<div className="flex items-center">
+                <img src={`${import.meta.env.BASE_URL}assets/logo.png`} className="w-[50px]" />
+				<h1 className="text-2xl ml-2">Playtest64</h1>
 			</div>
 		</header>
 	)
 }
 
+function HackStatusBadge({ status }: { status: string }) {
+    const normalizedStatus = status.toLowerCase();
+
+    const statusStyles: Record<string, string> = {
+        pending: "bg-yellow-500/15 text-yellow-600 border-yellow-500/30",
+        approved: "bg-green-500/15 text-green-600 border-green-500/30",
+        declined: "bg-red-500/15 text-red-600 border-red-500/30",
+    };
+
+    const label =
+        normalizedStatus.charAt(0).toUpperCase() +
+        normalizedStatus.slice(1);
+
+    return (
+        <Badge
+            variant="outline"
+            className={
+                statusStyles[normalizedStatus] ??
+                "bg-muted text-muted-foreground"
+            }
+        >
+            {label}
+        </Badge>
+    );
+}
+
 function ApprovedHacks() {
-  const [hacks, setHacks] = useState<ApprovedHack[]>([]);
+  //const [hacks, setHacks] = useState<ApprovedHack[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  //const [loading, setLoading] = useState(true);
+
+  const [hacks, setHacks] = useState<ApprovedHack[]>(
+        () => getCachedApprovedHacks() ?? []
+    );
+
+    const [loading, setLoading] = useState(
+        () => getCachedApprovedHacks() === null
+    );
 
   useEffect(() => {
     async function loadHacks() {
@@ -152,6 +354,12 @@ function ApprovedHacks() {
       } else {
         setHacks(data ?? []);
       }
+        
+        const approvedHacks = data ?? [];
+
+        setHacks(approvedHacks);
+        saveCachedApprovedHacks(approvedHacks);
+        setLoading(false);
 
       setLoading(false);
     }
@@ -183,10 +391,10 @@ function ApprovedHacks() {
     );
 }
 
-export function MyHacksGrid() {
+export function MyHacksGrid({ refreshKey }: MyHacksGridProps) {
     const { user, loading: authLoading } = useAuth();
 
-    const [hacks, setHacks] = useState<any[]>([]);
+    const [hacks, setHacks] = useState<ApprovedHack[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -204,6 +412,15 @@ export function MyHacksGrid() {
                 return;
             }
 
+            const cacheKey = user.id;
+
+            if (refreshKey === 0 && myHacksCache.has(cacheKey)) {
+                setHacks(myHacksCache.get(cacheKey) ?? []);
+                setLoading(false);
+                setError("");
+                return;
+            }
+
             setLoading(true);
             setError("");
 
@@ -218,7 +435,10 @@ export function MyHacksGrid() {
                 }
 
                 if (!cancelled) {
-                    setHacks(data ?? []);
+                    const fetchedHacks = data ?? [];
+
+                    setHacks(fetchedHacks);
+                    myHacksCache.set(cacheKey, fetchedHacks);
                 }
             } catch (err) {
                 if (!cancelled) {
@@ -240,30 +460,32 @@ export function MyHacksGrid() {
         return () => {
             cancelled = true;
         };
-    }, [user, authLoading]);
+    }, [user?.id, authLoading, refreshKey]);
 
     if (authLoading || loading) {
-        return (<Card>
-    <CardHeader>
-        <Skeleton className="h-4 w-2/3" />
-        <Skeleton className="h-4 w-1/2" />
-    </CardHeader>
-    <CardContent>
-        <Skeleton className="aspect-video w-full" />
-    </CardContent>
-    <CardFooter>
-        <Skeleton className="h-4 w-2/3" />
-    </CardFooter>
-    </Card>);
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <CardContent>
+                        <Skeleton className="aspect-video w-full" />
+                    </CardContent>
+                    <CardFooter>
+                        <Skeleton className="h-4 w-2/3" />
+                    </CardFooter>
+                </CardHeader>
+            </Card>
+        );
     }
 
     if (!user) {
-        return (<>
-                <div>
+        return (
+            <div>
                 <p>Please sign in to view your hacks.</p>
-                <DiscordLogin/>
-                </div>
-               </>);
+                <DiscordLogin />
+            </div>
+        );
     }
 
     if (error) {
@@ -274,56 +496,102 @@ export function MyHacksGrid() {
         return <p>You haven't created any hacks yet.</p>;
     }
 
-
     return (
-      <>
-        {hacks.map((hack) => (
-          <ApprovedHack key={hack.id} hack={hack} />
-        ))}
-      </>
+        <>
+            {hacks.map((hack) => (
+                <ApprovedHack
+                    key={hack.id}
+                    hack={hack}
+                    showStatus
+                />
+            ))}
+        </>
     );
 }
 
-function ApprovedHack({ hack }: { hack: ApprovedHack }) {
-  return (
-	<Link to={`/${encodeURIComponent(hack.slug)}`}>
-		<Card className="
-		  transition-all duration-300 ease-out
-		  hover:-translate-y-1
-		  hover:border-primary/50
-		  hover:shadow-lg hover:shadow-primary/10
-		  hover:scale-[1.01]
-		">
-		  <CardHeader>
-			<CardTitle>{hack.name}</CardTitle>
-			<CardDescription>
-			  {hack.short_description}
-			</CardDescription>
-		  </CardHeader>
+export function ApprovedHack({
+    hack,
+    onApprove,
+    onDecline,
+    actionLoading = false,
+    showStatus = false,
+}: ApprovedHackProps) {
+    return (
+        <Card className="
+            transition-all duration-300 ease-out
+            hover:-translate-y-1
+            hover:border-primary/50
+            hover:shadow-lg hover:shadow-primary/10
+            hover:scale-[1.01]
+        ">
+          <CardHeader>
+    <div className="flex items-center justify-between gap-2">
+        <CardTitle>
+            <Link to={`/${encodeURIComponent(hack.slug)}`}>
+                {hack.name}
+            </Link>
+        </CardTitle>
 
-		  <CardContent>
-			<img
-			  src={
-				supabase.storage
-				  .from("hack_thumbnails")
-				  .getPublicUrl(hack.image).data.publicUrl
-			  }
-			  alt={hack.name}
-			  className="w-full h-auto rounded-md"
-		  loading="lazy"
-		/>
-      </CardContent>
+        {showStatus && (
+            <HackStatusBadge status={hack.status} />
+        )}
+    </div>
 
-      <CardFooter>
-        <p>{hack.authors}</p>
-      </CardFooter>
-		</Card>
-	</Link>
-  );
+    <CardDescription>
+        {hack.short_description}
+    </CardDescription>
+</CardHeader> 
+
+           
+
+            <CardContent>
+                <Link to={`/${encodeURIComponent(hack.slug)}`}>
+                    <img
+                        src={
+                            supabase.storage
+                                .from("hack_thumbnails")
+                                .getPublicUrl(hack.image).data.publicUrl
+                        }
+                        alt={hack.name}
+                        className="w-full h-auto rounded-md"
+                        loading="lazy"
+                    />
+                </Link>
+            </CardContent>
+
+            <CardFooter className="flex flex-wrap items-center justify-between gap-3">
+                <p>{hack.authors}</p>
+
+                {(onApprove || onDecline) && (
+                    <div className="flex items-center gap-2">
+                        {onDecline && (
+                            <Button
+                                variant="destructive"
+                                disabled={actionLoading}
+                                onClick={onDecline}
+                            >
+                                {actionLoading ? "Processing..." : "Decline"}
+                            </Button>
+                        )}
+
+                        {onApprove && (
+                            <Button
+                                disabled={actionLoading}
+                                onClick={onApprove}
+                            >
+                                {actionLoading ? "Processing..." : "Approve"}
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </CardFooter>
+        </Card>
+    );
 }
 
 function HackPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [hack, setHack] = useState<ApprovedHack | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -356,18 +624,21 @@ function HackPage() {
 
   if (loading) return (
         <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
+            <div>
             <Header></Header>
 
             <Separator className="mt-2 mb-2"/>
 
-		  	<Link to="/">
-			  	<Button variant="outline" aria-label="Back">
-					<ArrowLeftIcon />
-					Back
-			  	</Button>	
-		  	</Link>
-
+            <Button
+                variant="outline"
+                aria-label="Back"
+                onClick={() => navigate(-1)}
+            >
+                <ArrowLeftIcon />
+                Back
+            </Button>	
             <p className="p-4">Loading hack...</p>
+            </div>
         </main>
   );
   if (error) return <p className="p-4">Error: {error}</p>;
@@ -379,6 +650,11 @@ function HackPage() {
         .getPublicUrl(hack.image).data.publicUrl
     : null;
 
+    let difficultyCategory: string = "Super Kaizo";
+    if(Number(hack.difficulty) < 10) difficultyCategory = "Casual";
+    else if(Number(hack.difficulty) < 15) difficultyCategory = "Light Kaizo";
+    else if(Number(hack.difficulty) < 20) difficultyCategory = "Normal Kaizo";
+
   return (
     <main className="animated-gradient min-h-screen">
 		<div className="max-w-4xl p-4">
@@ -386,12 +662,14 @@ function HackPage() {
 			
 			<Separator className="mt-2 mb-2"/>
 
-		  	<Link to="/">
-			  	<Button variant="outline" aria-label="Back">
-					<ArrowLeftIcon />
-					Back
-			  	</Button>	
-		  	</Link>
+            <Button
+                variant="outline"
+                aria-label="Back"
+                onClick={() => navigate(-1)}
+            >
+                <ArrowLeftIcon />
+                Back
+            </Button>	
 
 			<div className="mx-auto">
 			  <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
@@ -407,7 +685,10 @@ function HackPage() {
 			  )}
 
 			  <p className="mt-4">{hack.long_description}</p>
-			  <p className="mt-2">Difficulty: {hack.difficulty}</p>
+			    <div className="flex items-center">
+                    <p className="mt-2">Difficulty: {hack.difficulty}</p>
+                    <Badge className="mt-2 ml-2">{difficultyCategory}</Badge>
+                </div>
 			  <p className="">Tags: {hack.tags}</p>
 				
 			    <ApplyPlaytestDialog hackSlug={hack.slug} hackTitle={hack.name} ownerId={hack.owner_id}></ApplyPlaytestDialog>	
@@ -430,6 +711,8 @@ export function ApplyPlaytestDialog({
     const [open, setOpen] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+
+    const { isBanned, checkingBan } = useBanStatus(user?.id);
 
     async function applyPlaytest(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -539,6 +822,27 @@ export function ApplyPlaytestDialog({
 
     if (!user || user.id === ownerId) {
         return null;
+    }
+
+    if (checkingBan) {
+        return <p className="mt-2 text-sm text-muted-foreground">
+            Checking account status...
+        </p>;
+    }
+
+    if (isBanned === null) {
+        return <p className="mt-2 text-sm text-destructive" role="alert">
+            Could not verify your account status. Please try again later.
+        </p>;
+    }
+
+    if (isBanned) {
+        return (
+            <p className="mt-2 text-sm text-destructive" role="alert">
+                Your account is temporarily banned. You cannot apply for
+                playtesting while your ban is active.
+            </p>
+        );
     }
 
     return (
@@ -652,12 +956,14 @@ export function SubmitHackDialog({
     const [shortDescription, setShortDescription] = useState("");
     const [longDescription, setLongDescription] = useState("");
     const [authors, setAuthors] = useState("");
-    const [difficulty, setDifficulty] = useState("1");
+    const [difficulty, setDifficulty] = useState("0");
     const [tags, setTags] = useState("");
     const [thumbnail, setThumbnail] = useState<File | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
+
+    const { isBanned, checkingBan } = useBanStatus(user?.id);
 
 
     function resetForm() {
@@ -739,133 +1045,172 @@ export function SubmitHackDialog({
         image.src = objectUrl;
     }
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setErrorMessage("");
-        setSuccessMessage("");
+        
+async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
 
-        if (!user) {
-            setErrorMessage("You must sign in before submitting a hack.");
-            return;
-        }
-
-        if (!thumbnail) {
-            setErrorMessage("Please select a valid 4:3 thumbnail.");
-            return;
-        }
-
-        const parsedDifficulty = Number(difficulty);
-
-        if (
-            !Number.isFinite(parsedDifficulty) ||
-            parsedDifficulty < 0
-        ) {
-            setErrorMessage("Difficulty must be a non-negative number.");
-            return;
-        }
-
-        const normalizedSlug = slug
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "");
-
-        if (!normalizedSlug) {
-            setErrorMessage("Please enter a valid slug.");
-            return;
-        }
-
-        setSubmitting(true);
-
-        let uploadedPath: string | null = null;
-
-        try {
-            const fileExtension =
-                thumbnail.name.split(".").pop()?.toLowerCase() || "png";
-
-            const safeExtension = /^[a-z0-9]+$/.test(fileExtension)
-                ? fileExtension
-                : "png";
-
-            const thumbnailPath =
-                `${user.id}/${crypto.randomUUID()}.${safeExtension}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from("hack_thumbnails")
-                .upload(thumbnailPath, thumbnail, {
-                    contentType: thumbnail.type,
-                    upsert: false,
-                });
-
-            if (uploadError) {
-                throw new Error(
-                    `Thumbnail upload failed: ${uploadError.message}`
-                );
-            }
-
-            uploadedPath = thumbnailPath;
-
-            const { error: insertError } = await supabase
-                .from("hacks")
-                .insert({
-                    name: name.trim(),
-                    slug: normalizedSlug,
-                    short_description: shortDescription.trim(),
-                    image: thumbnailPath,
-                    long_description: longDescription.trim(),
-                    authors: authors.trim(),
-                    difficulty: parsedDifficulty,
-                    tags: tags,
-                    status: "pending",
-                    owner_id: user.id,
-                });
-
-            if (insertError) {
-                throw new Error(
-                    `Could not submit hack: ${insertError.message}`
-                );
-            }
-
-            setSuccessMessage(
-                "Your hack has been submitted for moderation!"
-            );
-
-            onSubmitted?.();
-
-            window.setTimeout(() => {
-                setOpen(false);
-                resetForm();
-            }, 1200);
-        } catch (error) {
-            console.error("Hack submission failed:", error);
-
-            setErrorMessage(
-                error instanceof Error
-                    ? error.message
-                    : "Something went wrong while submitting your hack."
-            );
-
-            // Remove the uploaded file if inserting the row failed.
-            if (uploadedPath) {
-                const { error: cleanupError } = await supabase.storage
-                    .from("hack_thumbnails")
-                    .remove([uploadedPath]);
-
-                if (cleanupError) {
-                    console.error(
-                        "Could not clean up uploaded thumbnail:",
-                        cleanupError.message
-                    );
-                }
-            }
-        } finally {
-            setSubmitting(false);
-        }
+    if (!user) {
+        setErrorMessage("You must sign in before submitting a hack.");
+        return;
     }
 
-    return (
-        <>
-        {user && (
+    if (checkingBan) {
+        setErrorMessage("Please wait while we verify your account status.");
+        return;
+    }
+
+    if (isBanned !== false) {
+        setErrorMessage(
+            isBanned === true
+                ? "Your account is temporarily banned and cannot upload hacks."
+                : "Could not verify your account status. Please try again."
+        );
+        return;
+    }
+
+    if (!thumbnail) {
+        setErrorMessage("Please select a valid 4:3 thumbnail.");
+        return;
+    }
+
+    const parsedDifficulty = Number(difficulty);
+
+    if (
+        !Number.isFinite(parsedDifficulty) ||
+        parsedDifficulty < 0
+    ) {
+        setErrorMessage("Difficulty must be a non-negative number.");
+        return;
+    }
+
+    const normalizedSlug = slug
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+    if (!normalizedSlug) {
+        setErrorMessage("Please enter a valid slug.");
+        return;
+    }
+
+    setSubmitting(true);
+
+    let uploadedPath: string | null = null;
+
+    try {
+        const {
+            data: currentlyBanned,
+            error: banError,
+        } = await supabase.rpc("is_current_user_banned");
+
+        if (banError) {
+            throw new Error(
+                "Could not verify your account status. Please try again."
+            );
+        }
+
+        if (currentlyBanned !== false) {
+            throw new Error(
+                "Your account is temporarily banned and cannot upload hacks."
+            );
+        }
+
+        const fileExtension =
+            thumbnail.name.split(".").pop()?.toLowerCase() || "png";
+
+        const safeExtension = /^[a-z0-9]+$/.test(fileExtension)
+            ? fileExtension
+            : "png";
+
+        const thumbnailPath =
+            `${user.id}/${crypto.randomUUID()}.${safeExtension}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from("hack_thumbnails")
+            .upload(thumbnailPath, thumbnail, {
+                contentType: thumbnail.type,
+                upsert: false,
+            });
+
+        if (uploadError) {
+            throw new Error(
+                `Thumbnail upload failed: ${uploadError.message}`
+            );
+        }
+
+        uploadedPath = thumbnailPath;
+
+        const { error: insertError } = await supabase
+            .from("hacks")
+            .insert({
+                name: name.trim(),
+                slug: normalizedSlug,
+                short_description: shortDescription.trim(),
+                image: thumbnailPath,
+                long_description: longDescription.trim(),
+                authors: authors.trim(),
+                difficulty: parsedDifficulty,
+                tags,
+                status: "pending",
+                owner_id: user.id,
+            });
+
+        if (insertError) {
+            throw new Error(
+                `Could not submit hack: ${insertError.message}`
+            );
+        }
+
+        setSuccessMessage(
+            "Your hack has been submitted for moderation!"
+        );
+
+        onSubmitted?.();
+
+        window.setTimeout(() => {
+            setOpen(false);
+            resetForm();
+        }, 1200);
+    } catch (error) {
+        console.error("Hack submission failed:", error);
+
+        setErrorMessage(
+            error instanceof Error
+                ? error.message
+                : "Something went wrong while submitting your hack."
+        );
+
+        if (uploadedPath) {
+            const pathToRemove = uploadedPath;
+
+            void supabase.storage
+                .from("hack_thumbnails")
+                .remove([pathToRemove])
+                .then(({ error: cleanupError }) => {
+                    if (cleanupError) {
+                        console.error(
+                            "Could not clean up uploaded thumbnail:",
+                            cleanupError.message
+                        );
+                    }
+                })
+                .catch((cleanupError) => {
+                    console.error(
+                        "Thumbnail cleanup failed:",
+                        cleanupError
+                    );
+                });
+        }
+    } finally {
+        setSubmitting(false);
+    }
+}
+    
+    
+        return (
         <Dialog
             open={open}
             onOpenChange={(nextOpen) => {
@@ -878,21 +1223,20 @@ export function SubmitHackDialog({
                 }
             }}
         >
-            <DialogTrigger>
-                {user && (<>
+            <DialogTrigger >
                 <Button className="mb-2">
-                <CirclePlus/>    
-                Submit Hack
-                </Button></>
-                )} 
+                    <CirclePlus />
+                    Submit Hack
+                </Button>
             </DialogTrigger>
 
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Submit Hack</DialogTitle>
                     <DialogDescription>
-                        Make your hack avialable for playtesting. Your submission
-                        will be reviewed by moderators before appearing publicly.
+                        Make your hack available for playtesting. Your
+                        submission will be reviewed by moderators before
+                        appearing publicly.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -905,7 +1249,7 @@ export function SubmitHackDialog({
                             onChange={(event) =>
                                 handleNameChange(event.target.value)
                             }
-                            placeholder="Tung Tung Tung Sahur's Brainrot Kaizo Demo 67 Green Comet"
+                            placeholder=""
                             maxLength={100}
                             required
                         />
@@ -917,7 +1261,7 @@ export function SubmitHackDialog({
                             id="hack-slug"
                             value={slug}
                             onChange={(event) => setSlug(event.target.value)}
-                            placeholder="triple-t-adventures"
+                            placeholder=""
                             pattern="[a-z0-9]+(-[a-z0-9]+)*"
                             maxLength={100}
                             required
@@ -938,130 +1282,140 @@ export function SubmitHackDialog({
                             onChange={(event) =>
                                 setShortDescription(event.target.value)
                             }
-                            placeholder="Explore Triple-T's wonderful world!"
+                            placeholder=""
                             maxLength={200}
                             required
                         />
                     </div>
 
-                   <div className="space-y-2">
-    <Label htmlFor="hack-thumbnail">Thumbnail</Label>
+                    <div className="space-y-2">
+                        <Label htmlFor="hack-thumbnail">Thumbnail</Label>
 
-    <div
-        className="relative flex min-h-48 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/20 transition-colors hover:border-primary/50"
-        onDragOver={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-        }}
-        onDrop={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
+                        <div
+                            className="relative flex min-h-48 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/20 transition-colors hover:border-primary/50"
+                            onDragOver={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }}
+                            onDrop={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
 
-            const file = event.dataTransfer.files?.[0];
+                                const file = event.dataTransfer.files?.[0];
 
-            if (!file) return;
+                                if (!file) {
+                                    return;
+                                }
 
-            const input = document.getElementById(
-                "hack-thumbnail"
-            ) as HTMLInputElement | null;
+                                const input = document.getElementById(
+                                    "hack-thumbnail"
+                                ) as HTMLInputElement | null;
 
-            if (!input) return;
+                                if (!input) {
+                                    return;
+                                }
 
-            const transfer = new DataTransfer();
-            transfer.items.add(file);
-            input.files = transfer.files;
-            input.dispatchEvent(
-                new Event("change", { bubbles: true })
-            );
-        }}
-    >
-        {thumbnail ? (
-            <div className="w-full space-y-3 p-3">
-                <img
-                    src={URL.createObjectURL(thumbnail)}
-                    alt="Thumbnail preview"
-                    className="aspect-[4/3] w-full rounded-md object-cover"
-                />
+                                const transfer = new DataTransfer();
+                                transfer.items.add(file);
+                                input.files = transfer.files;
+                                input.dispatchEvent(
+                                    new Event("change", { bubbles: true })
+                                );
+                            }}
+                        >
+                            {thumbnail ? (
+                                <div className="w-full space-y-3 p-3">
+                                    <img
+                                        src={URL.createObjectURL(thumbnail)}
+                                        alt="Thumbnail preview"
+                                        className="aspect-[4/3] w-full rounded-md object-cover"
+                                    />
 
-                <div className="flex items-center justify-between gap-3">
-                    <p className="truncate text-sm text-muted-foreground">
-                        {thumbnail.name}
-                    </p>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="truncate text-sm text-muted-foreground">
+                                            {thumbnail.name}
+                                        </p>
 
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                            setThumbnail(null);
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setThumbnail(null);
 
-                            const input = document.getElementById(
-                                "hack-thumbnail"
-                            ) as HTMLInputElement | null;
+                                                const input =
+                                                    document.getElementById(
+                                                        "hack-thumbnail"
+                                                    ) as HTMLInputElement | null;
 
-                            if (input) input.value = "";
-                        }}
-                    >
-                        Remove
-                    </Button>
-                </div>
-            </div>
-        ) : (
-            <div className="flex flex-col items-center gap-3 p-6 text-center">
-                <div className="rounded-full bg-muted p-3">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="28"
-                        height="28"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    >
-                        <rect
-                            width="18"
-                            height="18"
-                            x="3"
-                            y="3"
-                            rx="2"
-                        />
-                        <circle cx="9" cy="9" r="2" />
-                        <path d="m21 15-5-5L5 21" />
-                    </svg>
-                </div>
+                                                if (input) {
+                                                    input.value = "";
+                                                }
+                                            }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-3 p-6 text-center">
+                                    <div className="rounded-full bg-muted p-3">
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="28"
+                                            height="28"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        >
+                                            <rect
+                                                width="18"
+                                                height="18"
+                                                x="3"
+                                                y="3"
+                                                rx="2"
+                                            />
+                                            <circle cx="9" cy="9" r="2" />
+                                            <path d="m21 15-5-5L5 21" />
+                                        </svg>
+                                    </div>
 
-                <div className="space-y-1">
-                    <p className="text-sm font-medium">
-                        Drop your thumbnail here
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        PNG, JPEG, or WebP · 4:3 ratio · Max 5 MB
-                    </p>
-                </div>
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium">
+                                            Drop your thumbnail here
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            PNG, JPEG, or WebP · 4:3 ratio · Max
+                                            5 MB
+                                        </p>
+                                    </div>
 
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                        document.getElementById("hack-thumbnail")?.click()
-                    }
-                >
-                    Choose image
-                </Button>
-            </div>
-        )}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() =>
+                                            document
+                                                .getElementById("hack-thumbnail")
+                                                ?.click()
+                                        }
+                                    >
+                                        Choose image
+                                    </Button>
+                                </div>
+                            )}
 
-        <Input
-            id="hack-thumbnail"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={handleThumbnailChange}
-        />
-    </div>
-</div> 
+                            <Input
+                                id="hack-thumbnail"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={handleThumbnailChange}
+                            />
+                        </div>
+                    </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="hack-long-description">
@@ -1073,7 +1427,7 @@ export function SubmitHackDialog({
                             onChange={(event) =>
                                 setLongDescription(event.target.value)
                             }
-                            placeholder="Tung Tung Tung Sahur might be one of the best characters in all of fiction. His design, vibe, lore... it all makes for a fantastic little fella."
+                            placeholder=""
                             rows={6}
                             maxLength={10000}
                             required
@@ -1088,7 +1442,7 @@ export function SubmitHackDialog({
                             onChange={(event) =>
                                 setAuthors(event.target.value)
                             }
-                            placeholder="liuzijun, stranger_sm64"
+                            placeholder=""
                             maxLength={300}
                             required
                         />
@@ -1112,7 +1466,8 @@ export function SubmitHackDialog({
                             required
                         />
                         <p className="text-xs text-muted-foreground">
-                            0.0-10.0 Casual, 10.0-15.0 Light Kaizo, 15.0-20.0 Normal Kaizo, 20.0-Onwards Super Kaizo
+                            0-10 Casual, 10-15 Light Kaizo,
+                            15-20 Normal Kaizo, 20-Onwards Super Kaizo
                         </p>
                     </div>
 
@@ -1165,6 +1520,6 @@ export function SubmitHackDialog({
                     </DialogFooter>
                 </form>
             </DialogContent>
-        </Dialog>)}</>
+        </Dialog>
     );
-}
+    }
