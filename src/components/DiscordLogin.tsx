@@ -15,6 +15,20 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
+async function saveDiscordId() {
+    const { data, error } = await supabase.functions.invoke(
+        "save-discord-id"
+    );
+
+    if (error) {
+        console.error("Function error:", error);
+        console.error("Function error context:", error.context);
+        return;
+    }
+
+    console.log("Function response:", data);
+}
+
 export default function DiscordLogin() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,11 +55,15 @@ export default function DiscordLogin() {
     setLoading(false);
 }); 
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+   const {
+    data: { subscription },
+} = supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
+
+    if (session?.user) {
+        void saveDiscordId();
+    }
+}); 
 
     return () => {
       mounted = false;
@@ -101,7 +119,17 @@ const login = async () => {
     );
   }
 
+    const discordIdentity = user.identities?.find(
+        (identity) => identity.provider === "discord"
+    );
+
+    const discordId = discordIdentity?.identity_data?.sub
+    ?? discordIdentity?.id;
+
+    console.log(discordId);
+
   const metadata = user.user_metadata;
+
   const displayName =
     metadata.full_name ??
     metadata.name ??

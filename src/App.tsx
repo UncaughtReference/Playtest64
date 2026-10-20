@@ -37,6 +37,7 @@ import DiscordLogin from "@/components/DiscordLogin";
 
 import Account from "@/pages/Account";
 import MyHacks from "@/pages/MyHacks";
+import Playtesters, { PlaytestersList } from "@/pages/Playtesters";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -75,6 +76,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/account" element={<Account />} />
       <Route path="/my-hacks" element={<MyHacks />} />
+      <Route path="/playtesters" element={<Playtesters />} />
       <Route path="/:slug" element={<HackPage />} />
     </Routes>
   );
@@ -95,6 +97,7 @@ export function TabView({ defaultPage }: TabViewProps) {
 					<Link to="/"><TabsTrigger value="home">Home</TabsTrigger></Link>
 					<Link to="/account"><TabsTrigger value="account">Account</TabsTrigger></Link>
                     <Link to="/my-hacks"><TabsTrigger value="my-hacks">My Hacks</TabsTrigger></Link>
+                    <Link to="/playtesters"><TabsTrigger value="playtesters">Playtesters</TabsTrigger></Link>
 			  	</TabsList>
 	
 				<Separator className="mt-2 mb-2"/>
@@ -115,6 +118,10 @@ export function TabView({ defaultPage }: TabViewProps) {
 						<MyHacksGrid></MyHacksGrid>
 					</div>
               </TabsContent>
+
+                <TabsContent value="playtesters">
+                    <PlaytestersList/> 
+                </TabsContent>
 		    </Tabs> )
 }
 

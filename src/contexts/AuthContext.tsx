@@ -136,6 +136,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
 }, []);
 
+useEffect(() => {
+    let mounted = true;
+
+    const {
+        data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (mounted) {
+            setUser(session?.user ?? null);
+            setLoading(false);
+        }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (mounted) {
+            setUser(session?.user ?? null);
+            setLoading(false);
+        }
+    });
+
+    return () => {
+        mounted = false;
+        subscription.unsubscribe();
+    };
+}, []);
+
     const isModerator = role === "moderator" || role === "admin";
 
     return (
