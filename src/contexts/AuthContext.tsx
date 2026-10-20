@@ -1,118 +1,139 @@
+
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+    type ReactNode,
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 type AuthContextType = {
-  user: User | null;
-  loading: boolean;
-  role: string | null;
-  isModerator: boolean;
-  roleLoading: boolean;
+    user: User | null;
+    loading: boolean;
+    role: string | null;
+    isModerator: boolean;
+    roleLoading: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-
-    // Listen for login, logout, and session changes.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (mounted) {
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    });
-
-    // Restore the existing session on page load.
-   supabase.auth.getSession().then(({ data, error }) => {
-    if (!mounted) return;
-
-    if (error) {
-        console.error("Failed to restore auth session:", error.message);
-        setUser(null);
-        setLoading(false);
-        return;
-    }
-
-    setUser(data.session?.user ?? null);
-    setLoading(false);
-}); 
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string | null>(null);
     const [roleLoading, setRoleLoading] = useState(true);
 
     useEffect(() => {
-      let active = true;
+        let mounted = true;
 
-      async function loadRole() {
-        setRoleLoading(true);
-        setRole(null);
+        async function restoreSession() {
+            try {
+                const { data, error } = await supabase.auth.getSession();
 
-        if (!user) {
-          setRoleLoading(false);
-          return;
+                if (!mounted) return;
+
+                if (error) {
+                    console.error(
+                        "Failed to restore auth session:",
+                        error.message
+                    );
+                    setUser(null);
+                } else {
+                    setUser(data.session?.user ?? null);
+                }
+            } catch (error) {
+                if (mounted) {
+                    console.error("Session restoration failed:", error);
+                    setUser(null);
+                }
+            } finally {
+                if (mounted) {
+                    setLoading(false);
+                }
+            }
         }
 
-        const { data, error } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        void restoreSession();
 
-        if (!active) return;
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (!mounted) return;
 
-        if (error) {
-          console.error("Could not load user role:", error.message);
-        } else {
-          setRole(data?.role ?? null);
+            setUser(session?.user ?? null);
+            setLoading(false);
+        });
+
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+
+        async function loadRole() {
+            setRoleLoading(true);
+            setRole(null);
+
+            if (!user) {
+                setRoleLoading(false);
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from("user_roles")
+                    .select("role")
+                    .eq("user_id", user.id)
+                    .maybeSingle();
+
+                if (!active) return;
+
+                if (error) {
+                    console.error("Could not load user role:", error.message);
+                } else {
+                    setRole(data?.role ?? null);
+                }
+            } catch (error) {
+                if (active) {
+                    console.error("Could not load user role:", error);
+                }
+            } finally {
+                if (active) {
+                    setRoleLoading(false);
+                }
+            }
         }
 
-        setRoleLoading(false);
-      }
+        void loadRole();
 
-      loadRole();
-
-      return () => {
-        active = false;
-      };
+        return () => {
+            active = false;
+        };
     }, [user]);
 
     const isModerator = role === "moderator" || role === "admin";
 
     return (
-     <AuthContext.Provider
+        <AuthContext.Provider
             value={{ user, loading, role, isModerator, roleLoading }}
         >
-          {children}
-        </AuthContext.Provider> 
+            {children}
+        </AuthContext.Provider>
     );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+    const context = useContext(AuthContext);
 
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
+    if (!context) {
+        throw new Error("useAuth must be used inside AuthProvider");
+    }
 
-  return context;
+    return context;
 }
 
