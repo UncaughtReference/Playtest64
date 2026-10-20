@@ -51,22 +51,21 @@ export default function DiscordLogin() {
     };
   }, []);
 
-  async function login() {
-    setError(null);
+ const login = async () => {
+    const returnTo = window.location.href;
 
-const { error } = await supabase.auth.signInWithOAuth({
-    provider: "discord",
-    options: {
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
-    },
-}); 
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: "discord",
+        options: {
+            redirectTo: returnTo,
+        },
+    });
 
-if (error) {
-    console.error("Discord login failed:", error.message);
-} 
-
-    if (error) setError(error.message);
-  }
+    if (error) {
+        console.error("Discord login failed:", error);
+        toast.error(error.message);
+    }
+}; 
 
   async function logout() {
     const { error } = await supabase.auth.signOut();
@@ -77,9 +76,9 @@ if (error) {
     <Card>
         <CardContent>
             <Skeleton className="h-8 w-2/3 pb-2"/>
-            <Skeleton className="h-4 w-1/3"/>
-            <Skeleton className="h-4 w-1/3"/>
-            <Skeleton className="h-4 w-1/3"/>
+            <Skeleton className="h-4 w-1/3 mb-2"/>
+            <Skeleton className="h-4 w-1/3 mb-2"/>
+            <Skeleton className="h-4 w-1/3 mb-2"/>
             <Skeleton className="h-4 w-1/3"/>
         </CardContent>
     </Card>
