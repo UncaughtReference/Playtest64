@@ -25,9 +25,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input";
 
-import { ArrowLeftIcon, Gamepad2, Send, CirclePlus } from "lucide-react"
+import { ArrowLeftIcon, Gamepad2, CirclePlus } from "lucide-react"
 
-import { useEffect, useState, type FormEvent  } from "react";
+import { useEffect, useState, type FormEvent, type ChangeEvent  } from "react";
 import { supabase } from "@/lib/supabase";
 
 import { Routes, Route } from "react-router-dom";
@@ -652,6 +652,7 @@ export function SubmitHackDialog({
     const [errorMessage, setErrorMessage] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
 
+
     function resetForm() {
         setName("");
         setSlug("");
@@ -870,9 +871,9 @@ export function SubmitHackDialog({
                 }
             }}
         >
-            <DialogTrigger asChild>
+            <DialogTrigger>
                 {user && (<>
-                <Button className="mb-2" onClick={() => setIsSubmitDialogOpen(true)}>
+                <Button className="mb-2">
                 <CirclePlus/>    
                 Submit Hack
                 </Button></>

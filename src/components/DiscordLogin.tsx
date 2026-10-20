@@ -7,6 +7,8 @@ import { LogOut } from "lucide-react"
 
 import { useAuth } from "@/contexts/AuthContext";
 
+import { toast } from "sonner";
+
 import {
   Card,
   CardContent,
