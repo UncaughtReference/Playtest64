@@ -40,7 +40,7 @@ import { useEffect, useState, type FormEvent, type ChangeEvent  } from "react";
 import { supabase } from "@/lib/supabase";
 
 import { Routes, Route } from "react-router-dom";
-import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 
 import DiscordLogin from "@/components/DiscordLogin";
 
@@ -205,39 +205,44 @@ export function TabView({ defaultPage }: TabViewProps) {
         location.pathname,
     ]);
 
+    const navigate = useNavigate();
+
     return (
         <Tabs value={currentTab} className="pt-2">
-            <div className="tabs-scroll w-full overflow-x-auto">
-                <TabsList className="inline-flex w-max min-w-full justify-start">
-                    <TabsTrigger value="home" >
-                        <Link to="/">Home</Link>
-                    </TabsTrigger>
+                
+<div className="tabs-scroll w-full overflow-x-auto">
+    <TabsList className="inline-flex w-max min-w-full justify-start">
+        <TabsTrigger value="home" onClick={() => navigate("/")}>
+            Home
+        </TabsTrigger>
 
-                    <TabsTrigger value="account" >
-                        <Link to="/account">Account</Link>
-                    </TabsTrigger>
+        <TabsTrigger value="account" onClick={() => navigate("/account")}>
+            Account
+        </TabsTrigger>
 
-                    <TabsTrigger value="my-hacks" >
-                        <Link to="/my-hacks">My Hacks</Link>
-                    </TabsTrigger>
+        <TabsTrigger value="my-hacks" onClick={() => navigate("/my-hacks")}>
+            My Hacks
+        </TabsTrigger>
 
-                    <TabsTrigger value="playtesters" >
-                        <Link to="/playtesters">Playtesters</Link>
-                    </TabsTrigger>
+        <TabsTrigger value="playtesters" onClick={() => navigate("/playtesters")}>
+            Playtesters
+        </TabsTrigger>
 
-                    {showModeratorTabs && (
-                        <>
-                            <TabsTrigger value="mod-hacks" >
-                                <Link to="/mod-hacks">Mod: Hacks</Link>
-                            </TabsTrigger>
+        {showModeratorTabs && (
+            <>
+                <TabsTrigger value="mod-hacks" onClick={() => navigate("/mod-hacks")}>
+                    Mod: Hacks
+                </TabsTrigger>
 
-                            <TabsTrigger value="mod-users" >
-                                <Link to="/mod-users">Mod: Users</Link>
-                            </TabsTrigger>
-                        </>
-                    )}
-                </TabsList>
-            </div>
+                <TabsTrigger value="mod-users" onClick={() => navigate("/mod-users")}>
+                    Mod: Users
+                </TabsTrigger>
+            </>
+        )}
+    </TabsList>
+</div>
+   
+
 
             <Separator className="mt-2 mb-2" />
 
@@ -501,8 +506,10 @@ async function deleteHack() {
 
     if (!user) {
         return (
-            <div>
-                <p>Please sign in to view your hacks.</p>
+            <div className="p-4">
+                <p className="mb-3">
+                    Please sign in to view your playtesters!
+                </p>
                 <DiscordLogin />
             </div>
         );
@@ -631,10 +638,12 @@ function HackPage() {
         .getPublicUrl(hack.image).data.publicUrl
     : null;
 
-    let difficultyCategory: string = "Super Kaizo";
-    if(Number(hack.difficulty) < 10) difficultyCategory = "Casual";
-    else if(Number(hack.difficulty) < 15) difficultyCategory = "Light Kaizo";
-    else if(Number(hack.difficulty) < 20) difficultyCategory = "Normal Kaizo";
+    let difficultyCategory: string = "what the fuck";
+    if(Number(hack.difficulty) < 25) difficultyCategory = "Casual";
+    else if(Number(hack.difficulty) < 50) difficultyCategory = "Light Kaizo";
+    else if(Number(hack.difficulty) < 75) difficultyCategory = "Normal Kaizo";
+    else if(Number(hack.difficulty) < 100) difficultyCategory = "Super Kaizo";
+    else if(Number(hack.difficulty) == 100) difficultyCategory = "TAS Only";
 
   return (
     <main className="animated-gradient min-h-screen">
@@ -1191,7 +1200,8 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
 }
     
     
-        return (
+        return (<>
+        {user && (
         <Dialog
             open={open}
             onOpenChange={(nextOpen) => {
@@ -1442,13 +1452,12 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
                                 setDifficulty(event.target.value)
                             }
                             min="0"
-                            max="30"
                             step="any"
                             required
                         />
                         <p className="text-xs text-muted-foreground">
-                            0-10 Casual, 10-15 Light Kaizo,
-                            15-20 Normal Kaizo, 20-Onwards Super Kaizo
+                            0-25 Casual, 25-50 Light Kaizo,
+                            50-75 Normal Kaizo, 75-100 Super Kaizo, 100 TAS Only
                         </p>
                     </div>
 
@@ -1458,7 +1467,7 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
                             id="hack-tags"
                             value={tags}
                             onChange={(event) => setTags(event.target.value)}
-                            placeholder="kaizo, brainrot, green comet"
+                            placeholder=""
                         />
                         <p className="text-xs text-muted-foreground">
                             Separate tags with commas.
@@ -1501,6 +1510,6 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
                     </DialogFooter>
                 </form>
             </DialogContent>
-        </Dialog>
+        </Dialog>)}</>
     );
     }

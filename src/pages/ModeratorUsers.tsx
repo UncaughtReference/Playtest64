@@ -60,6 +60,45 @@ export function ModeratorUsersList() {
 
     const fetchedForUser = useRef<string | null>(null);
 
+    const invokeModerateUsers = async (body: {
+    action: string;
+    userId?: string;
+}) => {
+    const callFunction = async (accessToken: string) =>
+        supabase.functions.invoke("moderate-users", {
+            body,
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+        });
+
+    const {
+        data: { session },
+        error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session) {
+        throw new Error("Please sign in again.");
+    }
+
+    let result = await callFunction(session.access_token);
+
+    if (result.response?.status === 401) {
+        const {
+            data: { session: refreshedSession },
+            error: refreshError,
+        } = await supabase.auth.refreshSession();
+
+        if (refreshError || !refreshedSession) {
+            throw new Error("Session expired. Please sign in again.");
+        }
+
+        result = await callFunction(refreshedSession.access_token);
+    }
+
+    return result;
+}; 
+
     const fetchUsers = useCallback(
         async (showLoading = false) => {
             if (!user?.id) {
@@ -73,16 +112,23 @@ export function ModeratorUsersList() {
             setError("");
 
             try {
-                const { data, error } = await supabase.functions.invoke(
-                    "moderate-users",
-                    {
-                        body: { action: "list" },
-                    }
-                );
+                const { data, error } = await invokeModerateUsers({
+                    action: "list",
+                }); 
 
                 if (error) {
+                    console.error("moderate-users invocation failed:", error);
+
+                    if (error.context instanceof Response) {
+                        console.error("HTTP status:", error.context.status);
+                        console.error(
+                            "Response body:",
+                            await error.context.clone().text()
+                        );
+                    }
+
                     throw new Error(error.message);
-                }
+                } 
 
                 if (data?.error) {
                     throw new Error(data.error);
@@ -165,15 +211,10 @@ export function ModeratorUsersList() {
         setError("");
 
         try {
-            const { data, error } = await supabase.functions.invoke(
-                "moderate-users",
-                {
-                    body: {
-                        action,
-                        userId: target.id,
-                    },
-                }
-            );
+            const { data, error } = await invokeModerateUsers({
+                    action,
+                    userId: target.id,
+                }); 
 
             if (error) {
                 throw error;
@@ -227,7 +268,7 @@ export function ModeratorUsersList() {
                     type="search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search by Discord username, UUID, or role..."
+                    placeholder="You can search by username, uuid or role okay? okay"
                     className="w-full rounded-md border bg-background px-3 py-2"
                 />
 

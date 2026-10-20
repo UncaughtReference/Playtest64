@@ -200,7 +200,7 @@ export function ModeratorHacksGrid() {
                         {error}
                     </p>
                 )}
-                <p>There are no pending hacks to review! GG!</p>
+                <p className="text-green-500 font-bold">There are no pending hacks to review! GG!</p>
             </>
         );
     }
@@ -213,6 +213,8 @@ export function ModeratorHacksGrid() {
                         {error}
                     </p>
                 )}
+
+                <p>Yell at me if any hacks have typos or smth</p>
 
                 {hacks.map((hack) => (
                     <HackCard
