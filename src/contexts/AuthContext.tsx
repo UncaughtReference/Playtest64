@@ -224,7 +224,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     avatarUrl: accountDetails.avatarUrl,
                     role: verifiedRole,
                     cachedAt: Date.now(),
-                    isModerator: role === "moderator" || role === "admin",
+                    isModerator:
+                        verifiedRole === "moderator" ||
+                        verifiedRole === "admin",
                 });
             } catch (error) {
                 if (active) {
