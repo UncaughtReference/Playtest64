@@ -54,14 +54,16 @@ export default function DiscordLogin() {
   async function login() {
     setError(null);
 
-  const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}#/account`;
-
-const { error } = await supabase.auth.signInWithOAuth({
+ const { error } = await supabase.auth.signInWithOAuth({
     provider: "discord",
     options: {
-        redirectTo,
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}#/account`,
     },
-}); 
+});
+
+if (error) {
+    console.error("Discord login failed:", error.message);
+} 
 
     if (error) setError(error.message);
   }
