@@ -5,6 +5,15 @@ import "./index.css";
 
 import { AuthProvider } from "@/contexts/AuthContext";
 
+if (
+    (window.location.pathname === "/Playtest64/" ||
+        window.location.pathname === "/Playtest64") &&
+    window.location.hash === "" &&
+    !window.location.search
+) {
+    window.location.replace("/Playtest64/#/");
+}
+
 createRoot(document.getElementById("root")!).render(
     <HashRouter>
       <AuthProvider>

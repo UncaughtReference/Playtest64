@@ -36,16 +36,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Restore the existing session on page load.
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!mounted) return;
+   supabase.auth.getSession().then(({ data, error }) => {
+    if (!mounted) return;
 
-      if (error) {
-        console.error("Failed to restore auth session:", error);
-      }
+    if (error) {
+        console.error("Failed to restore auth session:", error.message);
+        setUser(null);
+        setLoading(false);
+        return;
+    }
 
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
+    setUser(data.session?.user ?? null);
+    setLoading(false);
+}); 
 
     return () => {
       mounted = false;

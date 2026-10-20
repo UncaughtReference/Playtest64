@@ -7,6 +7,12 @@ import { LogOut } from "lucide-react"
 
 import { useAuth } from "@/contexts/AuthContext";
 
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+
 export default function DiscordLogin() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -15,12 +21,23 @@ export default function DiscordLogin() {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getUser().then(({ data, error }) => {
-      if (!mounted) return;
-      if (error) setError(error.message);
-      setUser(data.user);
-      setLoading(false);
-    });
+   supabase.auth.getUser().then(({ data, error }) => {
+    if (!mounted) return;
+
+    if (error) {
+        if (error.name !== "AuthSessionMissingError") {
+            console.error("Failed to get user:", error.message);
+            setError(error.message);
+        }
+
+        setUser(null);
+        setLoading(false);
+        return;
+    }
+
+    setUser(data.user);
+    setLoading(false);
+}); 
 
     const {
       data: { subscription },
@@ -37,13 +54,14 @@ export default function DiscordLogin() {
   async function login() {
     setError(null);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "discord",
-      options: {
-        redirectTo: window.location.origin +
-          window.location.pathname,
-      },
-    });
+  const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}#/account`;
+
+const { error } = await supabase.auth.signInWithOAuth({
+    provider: "discord",
+    options: {
+        redirectTo,
+    },
+}); 
 
     if (error) setError(error.message);
   }
@@ -53,7 +71,17 @@ export default function DiscordLogin() {
     if (error) setError(error.message);
   }
 
-  if (loading) return <p>Loading account...</p>;
+  if (loading) return (
+    <Card>
+        <CardContent>
+            <Skeleton className="h-8 w-2/3 pb-2"/>
+            <Skeleton className="h-4 w-1/3"/>
+            <Skeleton className="h-4 w-1/3"/>
+            <Skeleton className="h-4 w-1/3"/>
+            <Skeleton className="h-4 w-1/3"/>
+        </CardContent>
+    </Card>
+  );
 
   if (!user) {
     return (
@@ -81,22 +109,26 @@ export default function DiscordLogin() {
         (<strong>User</strong>);
 
   return (
-    <div className="space-y-3">
-      {avatar && (
-        <img
-          src={avatar}
-          alt=""
-          className="h-16 w-16 rounded-full"
-        />
-      )}
-      <p className="mb-0">Signed in as <strong>{displayName}</strong></p>
-      <p>Role: {roleLoading ? "Loading..." : roleHtml ?? "User"}</p>
-      <Button variant="outline" onClick={logout}>
-	<LogOut />
-        Log out
-      </Button>
-      {error && <p role="alert">{error}</p>}
-    </div>
+    <Card>
+        <CardContent>
+        <div className="space-y-3">
+          {avatar && (
+            <img
+              src={avatar}
+              alt=""
+              className="h-16 w-16 rounded-full"
+            />
+          )}
+          <p className="mb-0">Signed in as <strong>{displayName}</strong></p>
+          <p>Role: {roleLoading ? "Loading..." : roleHtml ?? "User"}</p>
+          <Button variant="outline" onClick={logout}>
+        <LogOut />
+            Log out
+          </Button>
+          {error && <p role="alert">{error}</p>}
+        </div>
+        </CardContent>
+    </Card>
   );
 }
 
