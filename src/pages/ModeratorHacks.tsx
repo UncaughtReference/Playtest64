@@ -114,59 +114,67 @@ export function ModeratorHacksGrid() {
         };
     }, [user?.id, isModerator, roleLoading]);
 
-    async function updateHackStatus(
-        hackSlug: string,
-        status: "approved" | "declined"
-    ) {
-        if (!user || !isModerator) {
-            setError("You don't have permission to review hacks.");
-            return;
-        }
-
-        setActionLoading(hackSlug);
-        setError("");
-
-        try {
-            const { data, error } = await supabase
-                .from("hacks")
-                .update({ status })
-                .eq("slug", hackSlug)
-                .eq("status", "pending")
-                .select("slug, status")
-                .maybeSingle();
-
-            if (error) {
-                throw error;
-            }
-
-            if (!data) {
-                throw new Error(
-                    "No hack was updated. Check its slug, current status, and permissions."
-                );
-            }
-
-            setHacks((current) => {
-                const updated = current.filter(
-                    (hack) => hack.slug !== hackSlug
-                );
-
-                saveCachedModHacks(user.id, updated);
-
-                return updated;
-            });
-
-            // The home page's approved list may also need refreshing.
-            clearCachedHacks();
-        } catch (err) {
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to update hack status."
-            );
-        } finally {
-            setActionLoading(null);
-        }
+    
+async function updateHackStatus(
+    hackSlug: string,
+    status: "approved" | "declined"
+) {
+    if (!user || !isModerator) {
+        setError("You don't have permission to review hacks.");
+        return;
     }
+
+    setActionLoading(hackSlug);
+    setError("");
+
+    try {
+        const { data, error } = await supabase.functions.invoke(
+            "moderate-hack-status",
+            {
+                body: { hackSlug, status },
+            }
+        );
+
+        if (error) {
+            throw error;
+        }
+
+        if (data?.error) {
+            throw new Error(data.error);
+        }
+
+        if (!data?.hack) {
+            throw new Error("The hack status could not be confirmed.");
+        }
+
+        if (status === "approved" && !data.notificationSent) {
+            setError(
+                "Hack approved, but the Discord notification could not be sent."
+            );
+        }
+
+        setHacks((current) => {
+            const updated = current.filter(
+                (hack) => hack.slug !== hackSlug
+            );
+
+            saveCachedModHacks(user.id, updated);
+
+            return updated;
+        });
+
+        clearCachedHacks();
+    } catch (err) {
+        setError(
+            err instanceof Error
+                ? err.message
+                : "Failed to update hack status."
+        );
+    } finally {
+        setActionLoading(null);
+    }
+}
+
 
     if (roleLoading) {
         return <div>Loading permissions...</div>;
@@ -214,7 +222,7 @@ export function ModeratorHacksGrid() {
                     </p>
                 )}
 
-                <p>Yell at me if any hacks have typos or smth</p>
+                <p>Yell at me if any hacks have typos or invalid values or smth</p>
 
                 {hacks.map((hack) => (
                     <HackCard
