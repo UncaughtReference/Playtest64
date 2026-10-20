@@ -33,6 +33,16 @@ color: var(--color-zinc-100);
   animation: gradient-shift 15s ease infinite;
 }
 
+/* Hide scrollbar only for the tabs container */
+.tabs-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.tabs-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
 @theme inline {
 	--font-heading: var(--font-sans);
 	--font-sans: 'Inter Variable', sans-serif;

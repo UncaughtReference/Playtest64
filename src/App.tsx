@@ -207,35 +207,37 @@ export function TabView({ defaultPage }: TabViewProps) {
 
     return (
         <Tabs value={currentTab} className="pt-2">
-            <TabsList>
-                <TabsTrigger value="home" >
-                    <Link to="/">Home</Link>
-                </TabsTrigger>
+            <div className="tabs-scroll w-full overflow-x-auto">
+                <TabsList className="inline-flex w-max min-w-full justify-start">
+                    <TabsTrigger value="home" >
+                        <Link to="/">Home</Link>
+                    </TabsTrigger>
 
-                <TabsTrigger value="account" >
-                    <Link to="/account">Account</Link>
-                </TabsTrigger>
+                    <TabsTrigger value="account" >
+                        <Link to="/account">Account</Link>
+                    </TabsTrigger>
 
-                <TabsTrigger value="my-hacks" >
-                    <Link to="/my-hacks">My Hacks</Link>
-                </TabsTrigger>
+                    <TabsTrigger value="my-hacks" >
+                        <Link to="/my-hacks">My Hacks</Link>
+                    </TabsTrigger>
 
-                <TabsTrigger value="playtesters" >
-                    <Link to="/playtesters">Playtesters</Link>
-                </TabsTrigger>
+                    <TabsTrigger value="playtesters" >
+                        <Link to="/playtesters">Playtesters</Link>
+                    </TabsTrigger>
 
-                {showModeratorTabs && (
-                    <>
-                        <TabsTrigger value="mod-hacks" >
-                            <Link to="/mod-hacks">Mod: Hacks</Link>
-                        </TabsTrigger>
+                    {showModeratorTabs && (
+                        <>
+                            <TabsTrigger value="mod-hacks" >
+                                <Link to="/mod-hacks">Mod: Hacks</Link>
+                            </TabsTrigger>
 
-                        <TabsTrigger value="mod-users" >
-                            <Link to="/mod-users">Mod: Users</Link>
-                        </TabsTrigger>
-                    </>
-                )}
-            </TabsList>
+                            <TabsTrigger value="mod-users" >
+                                <Link to="/mod-users">Mod: Users</Link>
+                            </TabsTrigger>
+                        </>
+                    )}
+                </TabsList>
+            </div>
 
             <Separator className="mt-2 mb-2" />
 

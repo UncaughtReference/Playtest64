@@ -204,7 +204,7 @@ export function ModeratorUsersList() {
 
     if (!user || !isModerator) {
         return (
-            <p className="p-4 text-destructive">
+            <p className="text-destructive">
                 You don't have permission to view this page.
             </p>
         );
