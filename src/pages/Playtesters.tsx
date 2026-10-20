@@ -1,4 +1,5 @@
-import { Header, TabView } from "@/App";
+import { TabView } from "@/App";
+import Header from "@/components/layout/Header";;
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import DiscordLogin from "@/components/DiscordLogin";

@@ -3,7 +3,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Header, TabView } from "@/App"
+import { TabView } from "@/App";
+import Header from "@/components/layout/Header";
 import {
     AlertDialog,
     AlertDialogAction,

@@ -1,4 +1,5 @@
-import { Header, TabView } from "@/App"
+import { TabView } from "@/App";
+import Header from "@/components/layout/Header";
 
 export default function MyHacks() {
   return (

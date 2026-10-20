@@ -1,4 +1,6 @@
-import { Header, TabView, ApprovedHack } from "@/App"
+import { TabView } from "@/App";
+import Header from "@/components/layout/Header";
+import HackCard from "@/components/HackCard";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,8 +21,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import {
-    clearCachedApprovedHacks,
-} from "@/lib/approvedHacksCache";
+    clearCachedHacks,
+} from "@/lib/hacksCache";
 import {
     getCachedModHacks,
     saveCachedModHacks,
@@ -154,7 +156,7 @@ export function ModeratorHacksGrid() {
             });
 
             // The home page's approved list may also need refreshing.
-            clearCachedApprovedHacks();
+            clearCachedHacks();
         } catch (err) {
             setError(
                 err instanceof Error
@@ -213,7 +215,7 @@ export function ModeratorHacksGrid() {
                 )}
 
                 {hacks.map((hack) => (
-                    <ApprovedHack
+                    <HackCard
                         key={hack.slug}
                         hack={hack}
                         onApprove={() =>

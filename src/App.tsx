@@ -2,10 +2,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button"
@@ -25,6 +23,16 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { ArrowLeftIcon, Gamepad2, CirclePlus } from "lucide-react"
 
@@ -45,24 +53,15 @@ import ModeratorUsers, { ModeratorUsersList } from "@/pages/ModeratorUsers";
 import { useAuth } from "@/contexts/AuthContext";
 
 import {
-    getCachedApprovedHacks,
-    saveCachedApprovedHacks,
-} from "@/lib/approvedHacksCache";
+    getCachedHacks,
+    saveCachedHacks,
+    clearCachedHacks,
+} from "@/lib/hacksCache";
+import type { Hack } from "@/types/hack";
+import HackCard from "@/components/HackCard";
+import { clearCachedModHacks } from "@/lib/modHacksCache";
+import Header from "@/components/layout/Header";
 
-type ApprovedHack = {
-  id: number;
-  created_at: string;
-  name: string;
-  short_description: string;
-  long_description: string;
-  authors: string;
-  tags: string;
-  difficulty: number;
-  image: string;
-  slug: string;
-  owner_id: string;
-    status: string;
-};
 
 type ApplyPlaytestDialogProps = {
     hackSlug: string;
@@ -78,19 +77,12 @@ type SubmitHackDialogProps = {
     onSubmitted?: () => void;
 };
 
-type ApprovedHackProps = {
-    hack: ApprovedHack;
-    onApprove?: () => void;
-    onDecline?: () => void;
-    actionLoading?: boolean;
-    showStatus?: boolean;
-};
 
 type MyHacksGridProps = {
     refreshKey: number;
 };
 
-const myHacksCache = new Map<string, ApprovedHack[]>();
+const myHacksCache = new Map<string, Hack[]>();
 
 function useBanStatus(userId: string | undefined) {
     const [isBanned, setIsBanned] = useState<boolean | null>(null);
@@ -249,7 +241,7 @@ export function TabView({ defaultPage }: TabViewProps) {
 
             <TabsContent value="home">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <ApprovedHacks />
+                    <Hacks />
                 </div>
             </TabsContent>
 
@@ -292,80 +284,53 @@ export function TabView({ defaultPage }: TabViewProps) {
     );
 }
 
-export function Header() {
-	return (
-		<header className="flex items-center justify-between">
-			<div className="flex items-center">
-                <img src={`${import.meta.env.BASE_URL}assets/logo.png`} className="w-[50px]" />
-				<h1 className="text-2xl ml-2">Playtest64</h1>
-			</div>
-		</header>
-	)
-}
 
-function HackStatusBadge({ status }: { status: string }) {
-    const normalizedStatus = status.toLowerCase();
 
-    const statusStyles: Record<string, string> = {
-        pending: "bg-yellow-500/15 text-yellow-600 border-yellow-500/30",
-        approved: "bg-green-500/15 text-green-600 border-green-500/30",
-        declined: "bg-red-500/15 text-red-600 border-red-500/30",
-    };
-
-    const label =
-        normalizedStatus.charAt(0).toUpperCase() +
-        normalizedStatus.slice(1);
-
-    return (
-        <Badge
-            variant="outline"
-            className={
-                statusStyles[normalizedStatus] ??
-                "bg-muted text-muted-foreground"
-            }
-        >
-            {label}
-        </Badge>
-    );
-}
-
-function ApprovedHacks() {
-  //const [hacks, setHacks] = useState<ApprovedHack[]>([]);
+function Hacks() {
+  //const [hacks, setHacks] = useState<Hack[]>([]);
   const [error, setError] = useState<string | null>(null);
   //const [loading, setLoading] = useState(true);
 
-  const [hacks, setHacks] = useState<ApprovedHack[]>(
-        () => getCachedApprovedHacks() ?? []
+  const [hacks, setHacks] = useState<Hack[]>(
+        () => getCachedHacks<Hack[]>() ?? []
     );
 
     const [loading, setLoading] = useState(
-        () => getCachedApprovedHacks() === null
+        () => getCachedHacks<Hack[]>() === null
     );
 
-  useEffect(() => {
-    async function loadHacks() {
-      const { data, error } = await supabase
-        .from("hacks")
-        .select("*")
-        .eq("status", "approved");
+    useEffect(() => {
+        let cancelled = false;
 
-      if (error) {
-        setError(error.message);
-      } else {
-        setHacks(data ?? []);
-      }
-        
-        const approvedHacks = data ?? [];
+        async function loadHacks() {
+            const { data, error: fetchError } = await supabase
+                .from("hacks")
+                .select("*")
+                .eq("status", "approved");
 
-        setHacks(approvedHacks);
-        saveCachedApprovedHacks(approvedHacks);
-        setLoading(false);
+            if (cancelled) {
+                return;
+            }
 
-      setLoading(false);
-    }
+            if (fetchError) {
+                setError(fetchError.message);
+                setLoading(false);
+                return;
+            }
 
-    loadHacks();
-  }, []);
+            const fetchedHacks = data ?? [];
+            setHacks(fetchedHacks);
+            saveCachedHacks(fetchedHacks);
+            setError(null);
+            setLoading(false);
+        }
+
+        void loadHacks();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     if (loading) return (<Card>
     <CardHeader>
@@ -385,7 +350,7 @@ function ApprovedHacks() {
     return (
       <>
         {hacks.map((hack) => (
-          <ApprovedHack key={hack.id} hack={hack} />
+          <HackCard key={hack.id} hack={hack} />
         ))}
       </>
     );
@@ -394,9 +359,62 @@ function ApprovedHacks() {
 export function MyHacksGrid({ refreshKey }: MyHacksGridProps) {
     const { user, loading: authLoading } = useAuth();
 
-    const [hacks, setHacks] = useState<ApprovedHack[]>([]);
+    const [hacks, setHacks] = useState<Hack[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+const [hackToDelete, setHackToDelete] = useState<string | null>(null);
+const [deletingHackId, setDeletingHackId] = useState<string | null>(null);
+
+async function deleteHack() {
+    if (!user || !hackToDelete || deletingHackId) {
+        return;
+    }
+
+    const hackId = hackToDelete;
+    setDeletingHackId(hackId);
+
+    try {
+        const { data, error } = await supabase
+            .from("hacks")
+            .delete()
+            .eq("id", hackId)
+            .eq("owner_id", user.id)
+            .select("id");
+
+        if (error) {
+            throw error;
+        }
+
+        if (!data || data.length === 0) {
+            throw new Error(
+                "The hack wasn't deleted. Make sure you own this hack."
+            );
+        }
+
+        setHacks((current) => {
+            const updatedHacks = current.filter(
+                (hack) => String(hack.id) !== hackId
+            );
+            myHacksCache.set(user.id, updatedHacks);
+            return updatedHacks;
+        });
+
+        clearCachedHacks();
+        clearCachedModHacks(user.id);
+        setHackToDelete(null);
+    } catch (error) {
+        console.error("Failed to delete hack:", error);
+
+        alert(
+            error instanceof Error
+                ? error.message
+                : "Failed to delete hack."
+        );
+    } finally {
+        setDeletingHackId(null);
+    }
+}
 
     useEffect(() => {
         let cancelled = false;
@@ -499,100 +517,61 @@ export function MyHacksGrid({ refreshKey }: MyHacksGridProps) {
     return (
         <>
             {hacks.map((hack) => (
-                <ApprovedHack
+                <HackCard
                     key={hack.id}
                     hack={hack}
                     showStatus
+                    deletingHackId={deletingHackId}
+                    onRequestDelete={setHackToDelete}
                 />
             ))}
+            <AlertDialog
+    open={hackToDelete !== null}
+    onOpenChange={(open) => {
+        if (!open && deletingHackId === null) {
+            setHackToDelete(null);
+        }
+    }}
+>
+    <AlertDialogContent>
+        <AlertDialogHeader>
+            <AlertDialogTitle>
+                Delete this hack?
+            </AlertDialogTitle>
+
+            <AlertDialogDescription>
+                This action cannot be undone. The hack will be deleted
+                from your account.
+            </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingHackId !== null}>
+                Cancel
+            </AlertDialogCancel>
+
+            <AlertDialogAction
+                disabled={deletingHackId !== null}
+                onClick={(event) => {
+                    event.preventDefault();
+                    void deleteHack();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+                {deletingHackId !== null ? "Deleting..." : "Delete Hack"}
+            </AlertDialogAction>
+        </AlertDialogFooter>
+    </AlertDialogContent>
+</AlertDialog>
         </>
     );
 }
 
-export function ApprovedHack({
-    hack,
-    onApprove,
-    onDecline,
-    actionLoading = false,
-    showStatus = false,
-}: ApprovedHackProps) {
-    return (
-        <Card className="
-            transition-all duration-300 ease-out
-            hover:-translate-y-1
-            hover:border-primary/50
-            hover:shadow-lg hover:shadow-primary/10
-            hover:scale-[1.01]
-        ">
-          <CardHeader>
-    <div className="flex items-center justify-between gap-2">
-        <CardTitle>
-            <Link to={`/${encodeURIComponent(hack.slug)}`}>
-                {hack.name}
-            </Link>
-        </CardTitle>
-
-        {showStatus && (
-            <HackStatusBadge status={hack.status} />
-        )}
-    </div>
-
-    <CardDescription>
-        {hack.short_description}
-    </CardDescription>
-</CardHeader> 
-
-           
-
-            <CardContent>
-                <Link to={`/${encodeURIComponent(hack.slug)}`}>
-                    <img
-                        src={
-                            supabase.storage
-                                .from("hack_thumbnails")
-                                .getPublicUrl(hack.image).data.publicUrl
-                        }
-                        alt={hack.name}
-                        className="w-full h-auto rounded-md"
-                        loading="lazy"
-                    />
-                </Link>
-            </CardContent>
-
-            <CardFooter className="flex flex-wrap items-center justify-between gap-3">
-                <p>{hack.authors}</p>
-
-                {(onApprove || onDecline) && (
-                    <div className="flex items-center gap-2">
-                        {onDecline && (
-                            <Button
-                                variant="destructive"
-                                disabled={actionLoading}
-                                onClick={onDecline}
-                            >
-                                {actionLoading ? "Processing..." : "Decline"}
-                            </Button>
-                        )}
-
-                        {onApprove && (
-                            <Button
-                                disabled={actionLoading}
-                                onClick={onApprove}
-                            >
-                                {actionLoading ? "Processing..." : "Approve"}
-                            </Button>
-                        )}
-                    </div>
-                )}
-            </CardFooter>
-        </Card>
-    );
-}
 
 function HackPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const [hack, setHack] = useState<ApprovedHack | null>(null);
+  const [hack, setHack] = useState<Hack | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
