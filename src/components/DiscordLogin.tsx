@@ -53,17 +53,20 @@ export default function DiscordLogin() {
     };
   }, []);
 
- const login = async () => {
-    const returnTo = window.location.href;
+const login = async () => {
+    const returnPath = window.location.hash || "#/";
+
+    sessionStorage.setItem("auth-return-path", returnPath);
 
     const { error } = await supabase.auth.signInWithOAuth({
         provider: "discord",
         options: {
-            redirectTo: returnTo,
+            redirectTo: `${window.location.origin}/Playtest64/`,
         },
     });
 
     if (error) {
+        sessionStorage.removeItem("auth-return-path");
         console.error("Discord login failed:", error);
         toast.error(error.message);
     }

@@ -116,6 +116,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
     }, [user]);
 
+    useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+            if (event === "SIGNED_IN" && session) {
+                const returnPath = sessionStorage.getItem("auth-return-path");
+
+                if (returnPath) {
+                    sessionStorage.removeItem("auth-return-path");
+
+                    if (window.location.hash !== returnPath) {
+                        window.location.hash = returnPath.slice(1);
+                    }
+                }
+            }
+        }
+    );
+
+    return () => subscription.unsubscribe();
+}, []);
+
     const isModerator = role === "moderator" || role === "admin";
 
     return (
