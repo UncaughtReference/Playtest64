@@ -1,3 +1,4 @@
+import { showErrorToast } from "@/lib/toast";
 type CachedAccount = {
     userId: string;
     discordUsername: string;
@@ -44,11 +45,15 @@ export function saveCachedAccount(account: CachedAccount) {
                 cachedAt: Date.now(),
             })
         );
-    } catch (error) {
-        console.error("Could not cache account data:", error);
+    } catch {
+        showErrorToast("Could not cache account data.");
     }
 }
 
 export function clearCachedAccount() {
-    localStorage.removeItem(CACHE_KEY);
+    try {
+        localStorage.removeItem(CACHE_KEY);
+    } catch {
+        showErrorToast("Could not clear account cache.");
+    }
 }

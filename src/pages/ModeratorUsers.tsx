@@ -1,3 +1,4 @@
+import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,12 +32,12 @@ type ModeratorUser = {
 };
 
 export default function ModeratorUsers() {
-  return (
-    <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
-        <Header></Header>
-        <TabView defaultPage="mod-users"></TabView>
-    </main>
-  );
+    return (
+        <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
+            <Header></Header>
+            <TabView defaultPage="mod-users"></TabView>
+        </main>
+    );
 }
 
 export function ModeratorUsersList() {
@@ -47,57 +48,57 @@ export function ModeratorUsersList() {
         roleLoading,
     } = useAuth();
 
-    const [users, setUsers] = useState<ModeratorUser[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [ users, setUsers ] = useState<ModeratorUser[]>([]);
+    const [ loading, setLoading ] = useState(true);
 
-    const [error, setError] = useState("");
-    const [search, setSearch] = useState("");
+    const [ error, setError ] = useState("");
+    const [ search, setSearch ] = useState("");
 
-    const [userToModerate, setUserToModerate] =
+    const [ userToModerate, setUserToModerate ] =
         useState<ModeratorUser | null>(null);
 
-    const [banActionLoading, setBanActionLoading] = useState(false);
+    const [ banActionLoading, setBanActionLoading ] = useState(false);
 
     const fetchedForUser = useRef<string | null>(null);
 
     const invokeModerateUsers = async (body: {
-    action: string;
-    userId?: string;
-}) => {
-    const callFunction = async (accessToken: string) =>
-        supabase.functions.invoke("moderate-users", {
-            body,
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-        });
+        action: string;
+        userId?: string;
+    }) => {
+        const callFunction = async (accessToken: string) =>
+            supabase.functions.invoke("moderate-users", {
+                body,
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
 
-    const {
-        data: { session },
-        error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (sessionError || !session) {
-        throw new Error("Please sign in again.");
-    }
-
-    let result = await callFunction(session.access_token);
-
-    if (result.response?.status === 401) {
         const {
-            data: { session: refreshedSession },
-            error: refreshError,
-        } = await supabase.auth.refreshSession();
+            data: { session },
+            error: sessionError,
+        } = await supabase.auth.getSession();
 
-        if (refreshError || !refreshedSession) {
-            throw new Error("Session expired. Please sign in again.");
+        if (sessionError || !session) {
+            throw new Error("Please sign in again.");
         }
 
-        result = await callFunction(refreshedSession.access_token);
-    }
+        let result = await callFunction(session.access_token);
 
-    return result;
-}; 
+        if (result.response?.status === 401) {
+            const {
+                data: { session: refreshedSession },
+                error: refreshError,
+            } = await supabase.auth.refreshSession();
+
+            if (refreshError || !refreshedSession) {
+                throw new Error("Session expired. Please sign in again.");
+            }
+
+            result = await callFunction(refreshedSession.access_token);
+        }
+
+        return result;
+    };
 
     const fetchUsers = useCallback(
         async (showLoading = false) => {
@@ -114,21 +115,13 @@ export function ModeratorUsersList() {
             try {
                 const { data, error } = await invokeModerateUsers({
                     action: "list",
-                }); 
+                });
 
                 if (error) {
-                    console.error("moderate-users invocation failed:", error);
-
-                    if (error.context instanceof Response) {
-                        console.error("HTTP status:", error.context.status);
-                        console.error(
-                            "Response body:",
-                            await error.context.clone().text()
-                        );
-                    }
+                    showErrorToast("Failed to load moderator users.");
 
                     throw new Error(error.message);
-                } 
+                }
 
                 if (data?.error) {
                     throw new Error(data.error);
@@ -153,7 +146,7 @@ export function ModeratorUsersList() {
                 setLoading(false);
             }
         },
-        [user?.id]
+        [ user?.id ]
     );
 
     // Handle sign-out and account switching.
@@ -168,7 +161,7 @@ export function ModeratorUsersList() {
         }
 
         fetchedForUser.current = currentUserId;
-    }, [user?.id]);
+    }, [ user?.id ]);
 
     // Show cached data immediately, then refresh in the background.
     useEffect(() => {
@@ -212,9 +205,9 @@ export function ModeratorUsersList() {
 
         try {
             const { data, error } = await invokeModerateUsers({
-                    action,
-                    userId: target.id,
-                }); 
+                action,
+                userId: target.id,
+            });
 
             if (error) {
                 throw error;
@@ -252,14 +245,14 @@ export function ModeratorUsersList() {
     }
 
     const filteredUsers = users.filter((item) => {
-    const query = (search ?? "").toLowerCase();
+        const query = (search ?? "").toLowerCase();
 
-    return (
-        (item.discord_username ?? "").toLowerCase().includes(query) ||
-        (item.id ?? "").toLowerCase().includes(query) ||
-        (item.role ?? "").toLowerCase().includes(query)
-    );
-    }); 
+        return (
+            (item.discord_username ?? "").toLowerCase().includes(query) ||
+            (item.id ?? "").toLowerCase().includes(query) ||
+            (item.role ?? "").toLowerCase().includes(query)
+        );
+    });
 
     return (
         <>
@@ -290,7 +283,7 @@ export function ModeratorUsersList() {
                             const isBanned =
                                 item.banned_until !== null &&
                                 new Date(item.banned_until).getTime() >
-                                    Date.now();
+                                Date.now();
 
                             return (
                                 <Card key={item.id}>
@@ -346,7 +339,7 @@ export function ModeratorUsersList() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>
                             {userToModerate?.banned_until &&
-                            new Date(userToModerate.banned_until).getTime() >
+                                new Date(userToModerate.banned_until).getTime() >
                                 Date.now()
                                 ? "Unban this user?"
                                 : "Ban this user?"}
@@ -355,7 +348,7 @@ export function ModeratorUsersList() {
                         <AlertDialogDescription>
                             Are you sure you want to{" "}
                             {userToModerate?.banned_until &&
-                            new Date(userToModerate.banned_until).getTime() >
+                                new Date(userToModerate.banned_until).getTime() >
                                 Date.now()
                                 ? "unban"
                                 : "ban"}{" "}
@@ -389,8 +382,8 @@ export function ModeratorUsersList() {
                                     new Date(
                                         userToModerate.banned_until
                                     ).getTime() > Date.now()
-                                  ? "Confirm unban"
-                                  : "Confirm ban"}
+                                    ? "Confirm unban"
+                                    : "Confirm ban"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

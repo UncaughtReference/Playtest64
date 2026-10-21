@@ -29,8 +29,8 @@ if (
 
 createRoot(document.getElementById("root")!).render(
     <HashRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </HashRouter> 
+        <AuthProvider>
+            <App />
+        </AuthProvider>
+    </HashRouter>
 );

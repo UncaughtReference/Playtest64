@@ -1,3 +1,4 @@
+import { showErrorToast } from "@/lib/toast";
 const CACHE_KEY = "playtest64-hacks";
 const CACHE_DURATION = 5 * 60 * 1000;
 
@@ -26,8 +27,8 @@ export function getCachedHacks<T>(): T | null {
         }
 
         return cached.hacks;
-    } catch (error) {
-        console.error("Could not read approved hacks cache:", error);
+    } catch {
+        showErrorToast("Could not read approved hacks cache.");
         return null;
     }
 }
@@ -44,15 +45,15 @@ export function saveCachedHacks<T>(hacks: T): void {
         };
 
         sessionStorage.setItem(CACHE_KEY, JSON.stringify(cached));
-    } catch (error) {
-        console.error("Could not save approved hacks cache:", error);
+    } catch {
+        showErrorToast("Could not save approved hacks cache.");
     }
 }
 
 export function clearCachedHacks(): void {
     try {
         sessionStorage.removeItem(CACHE_KEY);
-    } catch (error) {
-        console.error("Could not clear approved hacks cache:", error);
+    } catch {
+        showErrorToast("Could not clear approved hacks cache.");
     }
 }

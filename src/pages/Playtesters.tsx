@@ -1,3 +1,4 @@
+import { showErrorToast } from "@/lib/toast";
 import { TabView } from "@/App";
 import Header from "@/components/layout/Header";;
 import { useEffect, useState } from "react";
@@ -37,17 +38,17 @@ type PlaytestApplication = {
     status: string;
 };
 
-const filters = ["all", "pending", "approved", "declined"] as const;
+const filters = [ "all", "pending", "approved", "declined" ] as const;
 
-type Filter = (typeof filters)[number];
+type Filter = (typeof filters)[ number ];
 
 export default function Playtesters() {
-  return (
-    <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
-        <Header></Header>
-        <TabView defaultPage="playtesters"></TabView>
-    </main>
-  );
+    return (
+        <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
+            <Header></Header>
+            <TabView defaultPage="playtesters"></TabView>
+        </main>
+    );
 }
 
 function getSafeCachedApplications(
@@ -61,25 +62,25 @@ function getSafeCachedApplications(
 export function PlaytestersList() {
     const { user } = useAuth();
 
-    const [applications, setApplications] = useState<PlaytestApplication[]>(
+    const [ applications, setApplications ] = useState<PlaytestApplication[]>(
         () => user ? getSafeCachedApplications(user.id) : []
     );
 
-    const [loading, setLoading] = useState(
+    const [ loading, setLoading ] = useState(
         () => user
             ? getCachedPlaytesters<PlaytestApplication[]>(user.id) === null
             : false
-    ); 
+    );
 
-    const [error, setError] = useState<string | null>(null);
-    const [filter, setFilter] = useState<Filter>("pending");
-    const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [ error, setError ] = useState<string | null>(null);
+    const [ filter, setFilter ] = useState<Filter>("pending");
+    const [ updatingId, setUpdatingId ] = useState<string | null>(null);
 
     async function copyDiscordUsername(username: string) {
         try {
             await navigator.clipboard.writeText(username);
-        } catch (error) {
-            console.error("Failed to copy Discord username:", error);
+        } catch {
+            showErrorToast("Failed to copy Discord username.");
         }
     }
 
@@ -111,7 +112,7 @@ export function PlaytestersList() {
             setApplications((current) => {
                 const updated = current.map((item) =>
                     item.applicant_id === application.applicant_id &&
-                    item.hack_name === application.hack_name
+                        item.hack_name === application.hack_name
                         ? { ...item, status }
                         : item
                 );
@@ -120,8 +121,8 @@ export function PlaytestersList() {
 
                 return updated;
             });
-            
-            if(status == "approved") {
+
+            if (status == "approved") {
                 async function addXp(userId: string, amount: number): Promise<number> {
                     const { data, error } = await supabase.rpc("add_xp", {
                         amount: amount,
@@ -133,7 +134,7 @@ export function PlaytestersList() {
                     }
 
                     return data as number;
-                } 
+                }
 
                 try {
                     const { data, error } = await supabase
@@ -143,19 +144,19 @@ export function PlaytestersList() {
                         .single();
 
                     if (error) {
-                        throw error; 
+                        throw error;
                     }
 
                     let calculatedXp = Math.round(50 + (data.difficulty * 0.25));
 
                     await addXp(application.applicant_id, calculatedXp);
                 } catch (error) {
-                    console.error("Failed to award XP:", error);
+                    showErrorToast("Failed to award XP.");
                 }
             }
 
         } catch (error) {
-            console.error("Failed to update application:", error);
+            showErrorToast("Failed to update playtest application.");
 
             setError(
                 error instanceof Error
@@ -187,7 +188,7 @@ export function PlaytestersList() {
             } else {
                 setApplications([]);
                 setLoading(true);
-            } 
+            }
 
             setError(null);
 
@@ -209,18 +210,18 @@ export function PlaytestersList() {
                 }
 
                 const freshApplications: PlaytestApplication[] = Array.isArray(data)
-    ? data as PlaytestApplication[]
-    : [];
+                    ? data as PlaytestApplication[]
+                    : [];
 
-setApplications(freshApplications);
-saveCachedPlaytesters(userId, freshApplications);
+                setApplications(freshApplications);
+                saveCachedPlaytesters(userId, freshApplications);
 
-            } catch (error) {
+            } catch {
                 if (cancelled) {
                     return;
                 }
 
-                console.error("Failed to fetch playtest applications:", error);
+                showErrorToast("Failed to fetch playtest applications.");
 
                 if (cached === null) {
                     setError("Couldn't load playtest applications.");
@@ -237,7 +238,7 @@ saveCachedPlaytesters(userId, freshApplications);
         return () => {
             cancelled = true;
         };
-    }, [user?.id]);
+    }, [ user?.id ]);
 
     if (!user) {
         return (

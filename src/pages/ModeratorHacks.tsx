@@ -1,9 +1,11 @@
+import { showErrorToast } from "@/lib/toast";
 import { TabView } from "@/App";
 import Header from "@/components/layout/Header";
 import HackCard from "@/components/HackCard";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Hack } from "@/types/hack";
 import {
     Card,
     CardContent,
@@ -29,24 +31,24 @@ import {
 } from "@/lib/modHacksCache";
 
 export default function ModeratorHacks() {
-  return (
-    <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
-        <Header></Header>
-        <TabView defaultPage="mod-hacks"></TabView>
-    </main>
-  );
+    return (
+        <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
+            <Header></Header>
+            <TabView defaultPage="mod-hacks"></TabView>
+        </main>
+    );
 }
 
 export function ModeratorHacksGrid() {
     const { user, isModerator, roleLoading } = useAuth();
 
-    const [hacks, setHacks] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-    const [actionLoading, setActionLoading] =
+    const [ hacks, setHacks ] = useState<Hack[]>([]);
+    const [ loading, setLoading ] = useState(true);
+    const [ error, setError ] = useState("");
+    const [ actionLoading, setActionLoading ] =
         useState<string | number | null>(null);
 
-    const [hackToDecline, setHackToDecline] = useState<{
+    const [ hackToDecline, setHackToDecline ] = useState<{
         slug: string;
         name: string;
     } | null>(null);
@@ -65,7 +67,7 @@ export function ModeratorHacksGrid() {
                 return;
             }
 
-            const cachedHacks = getCachedModHacks<any[]>(user.id);
+            const cachedHacks = getCachedModHacks<Hack[]>(user.id);
 
             if (cachedHacks) {
                 setHacks(cachedHacks);
@@ -87,7 +89,7 @@ export function ModeratorHacksGrid() {
                 }
 
                 if (!cancelled) {
-                    const fetchedHacks = data ?? [];
+                    const fetchedHacks: Hack[] = data ?? [];
 
                     setHacks(fetchedHacks);
                     saveCachedModHacks(user.id, fetchedHacks);
@@ -112,93 +114,93 @@ export function ModeratorHacksGrid() {
         return () => {
             cancelled = true;
         };
-    }, [user?.id, isModerator, roleLoading]);
+    }, [ user?.id, isModerator, roleLoading ]);
 
-    
-async function updateHackStatus(
-    hackSlug: string,
-    status: "approved" | "declined",
-    starCount: number,
-    playtimeHours: number,
-    playtimeMinutes: number,
-    ownerId: string,
-) {
-    if (!user || !isModerator) {
-        setError("You don't have permission to review hacks.");
-        return;
-    }
 
-    setActionLoading(hackSlug);
-    setError("");
-
-    try {
-        const { data, error } = await supabase.functions.invoke(
-            "moderate-hack-status",
-            {
-                body: { hackSlug, status },
-            }
-        );
-
-        if (error) {
-            throw error;
+    async function updateHackStatus(
+        hackSlug: string,
+        status: "approved" | "declined",
+        starCount: number,
+        playtimeHours: number,
+        playtimeMinutes: number,
+        ownerId: string,
+    ) {
+        if (!user || !isModerator) {
+            setError("You don't have permission to review hacks.");
+            return;
         }
 
-        if (data?.error) {
-            throw new Error(data.error);
-        }
+        setActionLoading(hackSlug);
+        setError("");
 
-        if (!data?.hack) {
-            throw new Error("The hack status could not be confirmed.");
-        }
-
-        if (status === "approved" && !data.notificationSent) {
-            setError(
-                "Hack approved, but the Discord notification could not be sent."
+        try {
+            const { data, error } = await supabase.functions.invoke(
+                "moderate-hack-status",
+                {
+                    body: { hackSlug, status },
+                }
             );
-        }
-
-        setHacks((current) => {
-            const updated = current.filter(
-                (hack) => hack.slug !== hackSlug
-            );
-
-            saveCachedModHacks(user.id, updated);
-
-            return updated;
-        });
-
-        async function addXp(userId: string, amount: number): Promise<number> {
-            const { data, error } = await supabase.rpc("add_xp", {
-                amount: amount,
-                target_user_id: userId,
-            });
 
             if (error) {
                 throw error;
             }
 
-            return data as number;
-        } 
+            if (data?.error) {
+                throw new Error(data.error);
+            }
 
-        let calculatedXp = Math.round(100 + (starCount + (playtimeHours * 30 + playtimeMinutes * 0.5)));
-        
-        try {
-            await addXp(ownerId, calculatedXp);
-        } catch (error) {
-            console.error("Failed to award XP:", error);
+            if (!data?.hack) {
+                throw new Error("The hack status could not be confirmed.");
+            }
+
+            if (status === "approved" && !data.notificationSent) {
+                setError(
+                    "Hack approved, but the Discord notification could not be sent."
+                );
+            }
+
+            setHacks((current) => {
+                const updated = current.filter(
+                    (hack) => hack.slug !== hackSlug
+                );
+
+                saveCachedModHacks(user.id, updated);
+
+                return updated;
+            });
+
+            async function addXp(userId: string, amount: number): Promise<number> {
+                const { data, error } = await supabase.rpc("add_xp", {
+                    amount: amount,
+                    target_user_id: userId,
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                return data as number;
+            }
+
+            let calculatedXp = Math.round(100 + (starCount + (playtimeHours * 30 + playtimeMinutes * 0.5)));
+
+            try {
+                await addXp(ownerId, calculatedXp);
+            } catch {
+                showErrorToast("Failed to award XP.");
+            }
+
+            clearCachedHacks();
+        } catch (err) {
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update hack status."
+            );
+        } finally {
+            setActionLoading(null);
         }
-
-        clearCachedHacks();
-    } catch (err) {
-        setError(
-            err instanceof Error
-                ? err.message
-                : "Failed to update hack status."
-        );
-    } finally {
-        setActionLoading(null);
     }
-}
 
 
     if (roleLoading) {
@@ -305,7 +307,7 @@ async function updateHackStatus(
                                 ) {
                                     void updateHackStatus(
                                         hackToDecline.slug,
-                                        "declined", 0, 0, 0, "" 
+                                        "declined", 0, 0, 0, ""
                                     ).then(() => {
                                         setHackToDecline(null);
                                     });

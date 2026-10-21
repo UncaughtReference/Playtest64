@@ -1,9 +1,9 @@
+import { showErrorToast } from "@/lib/toast";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { LogOut, BadgeCheck, Send, Hourglass, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
 import {
     Card,
     CardContent,
@@ -15,17 +15,15 @@ import { Progress } from "@/components/ui/progress"
 import { Link } from "react-router-dom"
 
 async function saveDiscordId() {
-    const { data, error } = await supabase.functions.invoke(
-        "save-discord-id"
-    );
+    try {
+        const { error } = await supabase.functions.invoke("save-discord-id");
 
-    if (error) {
-        console.error("Function error:", error);
-        console.error("Function error context:", error.context);
-        return;
+        if (error) {
+            showErrorToast("Could not synchronize your Discord account.");
+        }
+    } catch {
+        showErrorToast("Could not synchronize your Discord account.");
     }
-
-    console.log("Function response:", data);
 }
 
 export default function DiscordLogin() {
@@ -38,18 +36,18 @@ export default function DiscordLogin() {
         avatarUrl,
     } = useAuth();
 
-    const [error, setError] = useState<string | null>(null);
+    const [ error, setError ] = useState<string | null>(null);
 
     // Keep the Discord ID mapping synchronized after authentication.
     useEffect(() => {
         if (user) {
             void saveDiscordId();
         }
-    }, [user?.id]);
+    }, [ user?.id ]);
 
 
-    const [xp, setXp] = useState<number | null>(null);
-    
+    const [ xp, setXp ] = useState<number | null>(null);
+
     useEffect(() => {
         async function fetchXp() {
             if (!user?.id) {
@@ -57,74 +55,80 @@ export default function DiscordLogin() {
                 return;
             }
 
-            const { data, error } = await supabase
-                .from("user_roles")
-                .select("xp")
-                .eq("user_id", user.id)
-                .single();
+            try {
+                const { data, error } = await supabase
+                    .from("user_roles")
+                    .select("xp")
+                    .eq("user_id", user.id)
+                    .single();
 
-            if (error) {
-                console.error("Failed to fetch XP:", error);
-                return;
+                if (error) {
+                    showErrorToast("Failed to fetch XP.");
+                    return;
+                }
+
+                setXp(data.xp);
+            } catch {
+                showErrorToast("Failed to fetch XP.");
             }
-
-            setXp(data.xp);
         }
 
         void fetchXp();
-    }, [user?.id]); 
+    }, [ user?.id ]);
 
-    const [hackCount, setHackCount] = useState<number | null>(null);
-    const [approvedCount, setApprovedCount] = useState<number | null>(null);
-    const [pendingCount, setPendingCount] = useState<number | null>(null);
-    const [declinedCount, setDeclinedCount] = useState<number | null>(null);
+    const [ hackCount, setHackCount ] = useState<number | null>(null);
+    const [ approvedCount, setApprovedCount ] = useState<number | null>(null);
+    const [ pendingCount, setPendingCount ] = useState<number | null>(null);
+    const [ declinedCount, setDeclinedCount ] = useState<number | null>(null);
 
     useEffect(() => {
-    async function countHacks() {
-        setHackCount(null);
-        setApprovedCount(null);
-        setPendingCount(null);
-        setDeclinedCount(null);
+        async function countHacks() {
+            setHackCount(null);
+            setApprovedCount(null);
+            setPendingCount(null);
+            setDeclinedCount(null);
 
-        const results = await Promise.all([
-            supabase
-                .from("hacks")
-                .select("*", { count: "exact", head: true })
-                .eq("owner_id", user?.id),
+            try {
+                const results = await Promise.all([
+                    supabase
+                        .from("hacks")
+                        .select("*", { count: "exact", head: true })
+                        .eq("owner_id", user?.id),
 
-            supabase
-                .from("hacks")
-                .select("*", { count: "exact", head: true })
-                .eq("owner_id", user?.id)
-                .eq("status", "approved"),
+                    supabase
+                        .from("hacks")
+                        .select("*", { count: "exact", head: true })
+                        .eq("owner_id", user?.id)
+                        .eq("status", "approved"),
 
-            supabase
-                .from("hacks")
-                .select("*", { count: "exact", head: true })
-                .eq("owner_id", user?.id)
-                .eq("status", "pending"),
+                    supabase
+                        .from("hacks")
+                        .select("*", { count: "exact", head: true })
+                        .eq("owner_id", user?.id)
+                        .eq("status", "pending"),
 
-            supabase
-                .from("hacks")
-                .select("*", { count: "exact", head: true })
-                .eq("owner_id", user?.id)
-                .eq("status", "declined"),
-        ]);
+                    supabase
+                        .from("hacks")
+                        .select("*", { count: "exact", head: true })
+                        .eq("owner_id", user?.id)
+                        .eq("status", "declined"),
+                ]);
 
-        const [total, approved, pending, declined] = results;
+                const [ total, approved, pending, declined ] = results;
 
-        for (const result of results) {
-            if (result.error) {
-                console.error("Failed to count hacks:", result.error);
-                return;
+                if (results.some((result) => result.error)) {
+                    showErrorToast("Failed to load hack statistics.");
+                    return;
+                }
+
+                setHackCount(total.count ?? 0);
+                setApprovedCount(approved.count ?? 0);
+                setPendingCount(pending.count ?? 0);
+                setDeclinedCount(declined.count ?? 0);
+            } catch {
+                showErrorToast("Failed to load hack statistics.");
             }
         }
-
-        setHackCount(total.count ?? 0);
-        setApprovedCount(approved.count ?? 0);
-        setPendingCount(pending.count ?? 0);
-        setDeclinedCount(declined.count ?? 0);
-    }
 
         if (user?.id) {
             countHacks();
@@ -134,24 +138,39 @@ export default function DiscordLogin() {
             setPendingCount(0);
             setDeclinedCount(0);
         }
-    }, [user?.id]);
+    }, [ user?.id ]);
 
     const login = async () => {
         const returnPath = window.location.hash || "#/";
 
-        sessionStorage.setItem("auth-return-path", returnPath);
+        try {
+            sessionStorage.setItem(
+                "auth-return-path",
+                returnPath.startsWith("#/") ? returnPath : "#/"
+            );
+        } catch {
+            // OAuth can still proceed if session storage is unavailable.
+        }
 
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: "discord",
-            options: {
-                redirectTo: `${window.location.origin}/Playtest64/`,
-            },
-        });
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: "discord",
+                options: {
+                    redirectTo: `${window.location.origin}/Playtest64/`,
+                },
+            });
 
-        if (error) {
-            sessionStorage.removeItem("auth-return-path");
-            console.error("Discord login failed:", error);
-            toast.error(error.message);
+            if (error) {
+                throw error;
+            }
+        } catch {
+            try {
+                sessionStorage.removeItem("auth-return-path");
+            } catch {
+                // Storage may be unavailable; the login error is still reported.
+            }
+
+            showErrorToast("Discord login failed. Please try again.");
         }
 
     };
@@ -159,12 +178,66 @@ export default function DiscordLogin() {
     async function logout() {
         setError(null);
 
-        const { error } = await supabase.auth.signOut();
+        try {
+            const { error } = await supabase.auth.signOut();
 
-        if (error) {
-            setError(error.message);
+            if (error) {
+                throw error;
+            }
+        } catch {
+            setError("Could not log out. Please try again.");
+            showErrorToast("Could not log out. Please try again.");
         }
     }
+
+    const metadata = user?.user_metadata ?? {};
+
+    const displayNameCandidate = [
+        discordUsername,
+        metadata.global_name,
+        metadata.full_name,
+        metadata.name,
+        metadata.user_name,
+    ].find(
+        (value): value is string =>
+            typeof value === "string" && value.trim().length > 0
+    );
+
+    const displayName = displayNameCandidate ?? "Discord user";
+    const avatarCandidate = avatarUrl ?? metadata.avatar_url ?? metadata.picture;
+    const avatar =
+        typeof avatarCandidate === "string" &&
+        avatarCandidate.startsWith("https://")
+            ? avatarCandidate
+            : null;
+
+    useEffect(() => {
+        const userId = user?.id;
+
+        if (!userId) {
+            return;
+        }
+
+        async function saveProfile() {
+            try {
+                const { error } = await supabase
+                    .from("user_roles")
+                    .update({
+                        username: displayName,
+                        avatar_url: avatar,
+                    })
+                    .eq("user_id", userId);
+
+                if (error) {
+                    showErrorToast("Failed to update your profile.");
+                }
+            } catch {
+                showErrorToast("Failed to update your profile.");
+            }
+        }
+
+        void saveProfile();
+    }, [ user?.id, displayName, avatar ]);
 
     if (loading) {
         return (
@@ -197,76 +270,38 @@ export default function DiscordLogin() {
         );
     }
 
-    const metadata = user.user_metadata ?? {};
-
-    const displayName =
-        discordUsername ??
-        metadata.global_name ??
-        metadata.full_name ??
-        metadata.name ??
-        metadata.user_name ??
-        "Discord user";
-
-    const avatar =
-        avatarUrl ??
-        metadata.avatar_url ??
-        metadata.picture ??
-        null;
-
-useEffect(() => {
-    if (!user?.id) {
-        return;
-    }
-
-    async function saveProfile() {
-        const { error } = await supabase
-            .from("user_roles")
-            .update({
-                username: displayName,
-                avatar_url: avatar,
-            })
-            .eq("user_id", user?.id);
-
-        if (error) {
-            console.error("Failed to update user profile:", error);
-        }
-    }
-
-    void saveProfile();
-}, [user?.id, displayName, avatar]);
-
     let totalHackString: string;
-    if(hackCount == null) {
+    if (hackCount == null) {
         totalHackString = "Loading...";
     } else {
-        if(hackCount == 1) totalHackString = hackCount + " hack submitted";
+        if (hackCount == 1) totalHackString = hackCount + " hack submitted";
         else totalHackString = hackCount + " hacks submitted";
     }
 
     let totalApprovedHackString: string;
-    if(approvedCount == null) {
+    if (approvedCount == null) {
         totalApprovedHackString = "Loading...";
     } else {
-        if(approvedCount == 1) totalApprovedHackString = approvedCount + " approved hack";
+        if (approvedCount == 1) totalApprovedHackString = approvedCount + " approved hack";
         else totalApprovedHackString = approvedCount + " approved hacks";
     }
 
     let totalPendingHackString: string;
-    if(pendingCount == null) {
+    if (pendingCount == null) {
         totalPendingHackString = "Loading...";
     } else {
-        if(pendingCount == 1) totalPendingHackString = pendingCount + " pending hack";
+        if (pendingCount == 1) totalPendingHackString = pendingCount + " pending hack";
         else totalPendingHackString = pendingCount + " pending hacks";
     }
 
     let totalDeclinedHackString: string;
-    if(declinedCount == null) {
+    if (declinedCount == null) {
         totalDeclinedHackString = "Loading...";
     } else {
-        if(declinedCount == 1) totalDeclinedHackString = declinedCount + " declined hack";
+        if (declinedCount == 1) totalDeclinedHackString = declinedCount + " declined hack";
         else totalDeclinedHackString = declinedCount + " declined hacks";
     }
-    
+
     const subLevels = [
         1,
         5,
@@ -283,10 +318,10 @@ useEffect(() => {
     let maxXpMult = 2.25;
     let subLevel = 1;
 
-    if(xp != null) {
-        while(xp >= maxXp) {
-            for(let i = 0; i < 8; i++) {
-                if(level == subLevels[i]) { subLevel = 1; break; }
+    if (xp != null) {
+        while (xp >= maxXp) {
+            for (let i = 0;i < 8;i++) {
+                if (level == subLevels[ i ]) { subLevel = 1; break; }
             }
 
             maxXp *= maxXpMult;
@@ -294,10 +329,10 @@ useEffect(() => {
             level++;
             subLevel++;
 
-            if(level > 3) {
-                if(level > 6) {
-                    if(level > 9) {
-                        if(level > 12) {
+            if (level > 3) {
+                if (level > 6) {
+                    if (level > 9) {
+                        if (level > 12) {
                             maxXpMult = 1.025;
                         } else {
                             maxXpMult = 1.05;
@@ -313,8 +348,8 @@ useEffect(() => {
     }
 
     const progress = xp === null
-    ? 0
-    : Math.min((xp / maxXp) * 100, 100); 
+        ? 0
+        : Math.min((xp / maxXp) * 100, 100);
 
     const levelNames = [
         "Baby Tester",
@@ -329,13 +364,13 @@ useEffect(() => {
 
     let levelId = 0;
 
-    if(level > 5) {
-        if(level > 10) {
-            if(level > 15) {
-                if(level > 20) {
-                    if(level > 25) {
-                        if(level > 30) {
-                            if(level > 35) {
+    if (level > 5) {
+        if (level > 10) {
+            if (level > 15) {
+                if (level > 20) {
+                    if (level > 25) {
+                        if (level > 30) {
+                            if (level > 35) {
                                 levelId = 7;
                             } else {
                                 levelId = 6;
@@ -357,28 +392,28 @@ useEffect(() => {
         }
     }
 
-    const levelName = levelNames[levelId];
+    const levelName = levelNames[ levelId ];
 
     function toRomanNumeral(num: number): string {
-        const romanNumerals: [number, string][] = [
-            [1000, "M"],
-            [900, "CM"],
-            [500, "D"],
-            [400, "CD"],
-            [100, "C"],
-            [90, "XC"],
-            [50, "L"],
-            [40, "XL"],
-            [10, "X"],
-            [9, "IX"],
-            [5, "V"],
-            [4, "IV"],
-            [1, "I"],
+        const romanNumerals: [ number, string ][] = [
+            [ 1000, "M" ],
+            [ 900, "CM" ],
+            [ 500, "D" ],
+            [ 400, "CD" ],
+            [ 100, "C" ],
+            [ 90, "XC" ],
+            [ 50, "L" ],
+            [ 40, "XL" ],
+            [ 10, "X" ],
+            [ 9, "IX" ],
+            [ 5, "V" ],
+            [ 4, "IV" ],
+            [ 1, "I" ],
         ];
 
         let result = "";
 
-        for (const [value, symbol] of romanNumerals) {
+        for (const [ value, symbol ] of romanNumerals) {
             while (num >= value) {
                 result += symbol;
                 num -= value;
@@ -400,32 +435,32 @@ useEffect(() => {
                         />
                     )}
                     <div>
-                    <p className="mb-0 ml-2">
-                        <strong>{displayName}</strong>
-                    </p>
+                        <p className="mb-0 ml-2">
+                            <strong>{displayName}</strong>
+                        </p>
 
-                    <p className="ml-2 mt-1">
-                        {roleLoading ? (
-                            "Loading..."
-                        ) : isModerator ? (
-                            <Badge variant="outline" className="bg-green-500/15 text-green-600 border-green-500/30">
-                                Moderator
-                            </Badge>
-                        ) : (
-                            <Badge variant="outline">
-                                User
-                            </Badge>
-                        )}
-                    </p>
+                        <p className="ml-2 mt-1">
+                            {roleLoading ? (
+                                "Loading..."
+                            ) : isModerator ? (
+                                <Badge variant="outline" className="bg-green-500/15 text-green-600 border-green-500/30">
+                                    Moderator
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline">
+                                    User
+                                </Badge>
+                            )}
+                        </p>
                     </div>
 
                     {error && <p role="alert">{error}</p>}
                 </div>
 
-            <Button className="mt-2" variant="destructive" onClick={logout}>
-                <LogOut />
-                Log out
-            </Button>
+                <Button className="mt-2" variant="destructive" onClick={logout}>
+                    <LogOut />
+                    Log out
+                </Button>
             </CardContent>
         </Card>
 
@@ -433,7 +468,7 @@ useEffect(() => {
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <Send /> 
+                        <Send />
                         <p className="ml-2">{totalHackString}</p>
                     </div>
                 </CardContent>
@@ -441,7 +476,7 @@ useEffect(() => {
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <BadgeCheck className="text-green-500"/>
+                        <BadgeCheck className="text-green-500" />
                         <p className="ml-2">{totalApprovedHackString}</p>
                     </div>
                 </CardContent>
@@ -449,7 +484,7 @@ useEffect(() => {
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <Hourglass color="#eab308"/>
+                        <Hourglass color="#eab308" />
                         <p className="ml-2">{totalPendingHackString}</p>
                     </div>
                 </CardContent>
@@ -457,40 +492,40 @@ useEffect(() => {
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <X className="text-red-500"/> 
+                        <X className="text-red-500" />
                         <p className="ml-2">{totalDeclinedHackString}</p>
                     </div>
                 </CardContent>
             </Card>
         </div>
 
-            <Card className="min-w-0 flex-1 mt-2">
-                <CardContent>
-                    <p>{levelName} {toRomanNumeral(subLevel)}</p>
-                    <div className="flex items-center gap-2 mt-2">  
-                        <p className="text-lg">{level}</p>
-                        <div className="relative w-full">
-                            <Progress value={progress} className="w-full h-4"/>
-                            <span className="absolute inset-0 flex items-center justify-center font-bold">
-                                {xp} / {maxXp} XP
-                            </span>
-                        </div>
+        <Card className="min-w-0 flex-1 mt-2">
+            <CardContent>
+                <p>{levelName} {toRomanNumeral(subLevel)}</p>
+                <div className="flex items-center gap-2 mt-2">
+                    <p className="text-lg">{level}</p>
+                    <div className="relative w-full">
+                        <Progress value={progress} className="w-full h-4" />
+                        <span className="absolute inset-0 flex items-center justify-center font-bold">
+                            {xp} / {maxXp} XP
+                        </span>
                     </div>
-                </CardContent>
-            </Card>
-       
+                </div>
+            </CardContent>
+        </Card>
+
         <div>
             <p className="mt-2">Join the <strong>Playtest64 Discord server</strong> to get updates on your hacks and newly approved ones!</p>
-            
+
             <Link to="https://discord.gg/zZtHrffxEd" target="_blank" rel="noopener noreferrer">
-            <Button className="mt-2" variant="outline">
-                <img
-                    src={`${import.meta.env.BASE_URL}assets/discord-icon.svg`}
-                    alt=""
-                    className="w-[20px]"
-                />
-                Join    
-            </Button></Link>
+                <Button className="mt-2" variant="outline">
+                    <img
+                        src={`${import.meta.env.BASE_URL}assets/discord-icon.svg`}
+                        alt=""
+                        className="w-[20px]"
+                    />
+                    Join
+                </Button></Link>
         </div>
     </>);
 }

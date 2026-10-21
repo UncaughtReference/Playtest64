@@ -1,3 +1,4 @@
+import { showErrorToast } from "@/lib/toast";
 const CACHE_KEY = "playtest64-playtesters";
 const CACHE_DURATION = 2 * 60 * 1000;
 
@@ -35,8 +36,8 @@ export function getCachedPlaytesters<T>(
         }
 
         return cached.data as T;
-    } catch (error) {
-        console.error("Could not read playtesters cache:", error);
+    } catch {
+        showErrorToast("Could not read playtesters cache.");
         return null;
     }
 }
@@ -60,15 +61,15 @@ export function saveCachedPlaytesters<T>(
             getUserCacheKey(userId),
             JSON.stringify(cached)
         );
-    } catch (error) {
-        console.error("Could not save playtesters cache:", error);
+    } catch {
+        showErrorToast("Could not save playtesters cache.");
     }
 }
 
 export function clearCachedPlaytesters(userId: string): void {
     try {
         sessionStorage.removeItem(getUserCacheKey(userId));
-    } catch (error) {
-        console.error("Could not clear playtesters cache:", error);
+    } catch {
+        showErrorToast("Could not clear playtesters cache.");
     }
 }

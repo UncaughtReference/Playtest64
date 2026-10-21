@@ -36,6 +36,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast, Toaster } from "@/components/ui/toast"
+import { showErrorToast } from "@/lib/toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     Avatar,
@@ -142,8 +143,8 @@ function useBanStatus(userId: string | undefined) {
                 if (!cancelled) {
                     setIsBanned(data === true);
                 }
-            } catch (error) {
-                console.error("Could not check ban status:", error);
+            } catch {
+                showErrorToast("Could not check ban status.");
 
                 if (!cancelled) {
                     setIsBanned(null);
@@ -182,12 +183,12 @@ export default function App() {
 }
 
 function Home() {
-	return ( 
-		<div className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
-			<Header></Header>
-		    <TabView defaultPage="home"></TabView>	
+    return ( 
+        <div className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
+            <Header></Header>
+            <TabView defaultPage="home"></TabView>    
             </div>
-	)
+    )
 }
 
 export function TabView({ defaultPage }: TabViewProps) {
@@ -443,7 +444,7 @@ async function deleteHack() {
         clearCachedModHacks(user.id);
         setHackToDelete(null);
     } catch (error) {
-        console.error("Failed to delete hack:", error);
+        
 
         toast.add({
             type: "error",
@@ -641,7 +642,7 @@ function HackPage() {
         );
 
         if (error) {
-            console.error("Failed to fetch playtester profiles:", error);
+            showErrorToast("Failed to fetch playtester profiles.");
             return;
         }
 
@@ -697,7 +698,7 @@ function HackPage() {
             >
                 <ArrowLeftIcon />
                 Back
-            </Button>	
+            </Button>    
             <p className="p-4">Loading hack...</p>
             </div>
         </main>
@@ -727,7 +728,7 @@ function HackPage() {
             }
             await navigator.clipboard.writeText(credits);
         } catch (error) {
-            console.error("Failed to copy credits:", error);
+            
             toast.add({
                 type: "error",
                 description: `Failed to copy credits: ${
@@ -742,10 +743,10 @@ function HackPage() {
 
   return (
     <main className="animated-gradient min-h-screen">
-		<div className="mx-auto p-4">
-			<Header></Header>
-			
-			<Separator className="mt-2 mb-2"/>
+        <div className="mx-auto p-4">
+            <Header></Header>
+            
+            <Separator className="mt-2 mb-2"/>
 
             <Button
                 variant="outline"
@@ -754,34 +755,34 @@ function HackPage() {
             >
                 <ArrowLeftIcon />
                 Back
-            </Button>	
+            </Button>    
             
             <div className="flex">
-			<div className="mx-auto flex-1">
-			  <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
-			  <p className="mt-2">{hack.short_description}</p>
-			  <div className="flex items-center"><Users className="mt-1"/><p className="mt-2 ml-1"><strong>Authors:</strong> {hack.authors}</p></div>
+            <div className="mx-auto flex-1">
+              <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
+              <p className="mt-2">{hack.short_description}</p>
+              <div className="flex items-center"><Users className="mt-1"/><p className="mt-2 ml-1"><strong>Authors:</strong> {hack.authors}</p></div>
 
-			  {imageUrl && (
-				<img
-				  src={imageUrl}
-				  alt={hack.name}
-				  className="mt-4 w-[400px] rounded-lg"
-				/>
-			  )}
+              {imageUrl && (
+                <img
+                  src={imageUrl}
+                  alt={hack.name}
+                  className="mt-4 w-[400px] rounded-lg"
+                />
+              )}
 
-			  <p className="mt-4">{hack.long_description}</p>
-			    <div className="flex items-center">
+              <p className="mt-4">{hack.long_description}</p>
+                <div className="flex items-center">
                     <div className="flex items-center"><Flame/><p className="mt-2 ml-1"><strong>Difficulty:</strong> {hack.difficulty}</p></div>
                     <Badge className="mt-2 ml-2">{difficultyCategory}</Badge>
                 </div>
                 <div className="flex items-center"><Star /><p className="ml-1"><strong>Star Count:</strong> {hack.star_count}</p></div>
                 <div className="flex items-center"><Timer /><p className="ml-1"><strong>Playtime:</strong> {hack.playtime_hours}h {hack.playtime_minutes}m</p></div>
-			  <div className="flex items-center"><Tags/><p className="ml-1"><strong>Tags:</strong> {hack.tags}</p></div>
-				
-			    <ApplyPlaytestDialog hackSlug={hack.slug} hackTitle={hack.name} ownerId={hack.owner_id}></ApplyPlaytestDialog>	
+              <div className="flex items-center"><Tags/><p className="ml-1"><strong>Tags:</strong> {hack.tags}</p></div>
+                
+                <ApplyPlaytestDialog hackSlug={hack.slug} hackTitle={hack.name} ownerId={hack.owner_id}></ApplyPlaytestDialog>    
 
-			</div>
+            </div>
 
             {user?.id === hack.owner_id && (
     <Card className="mt-2 w-1/4">
@@ -812,7 +813,7 @@ function HackPage() {
     </Card>
 )}
 </div>
-	  </div>
+      </div>
     </main>
   );
 }
@@ -872,11 +873,13 @@ export function ApplyPlaytestDialog({
                 "Discord user"
             );
 
-            const avatarUrl = (
-                metadata.avatar_url ??
-                metadata.picture ??
-                null
-            ) as string | null;
+            const avatarCandidate =
+                metadata.avatar_url ?? metadata.picture ?? null;
+            const avatarUrl =
+                typeof avatarCandidate === "string" &&
+                avatarCandidate.startsWith("https://")
+                    ? avatarCandidate
+                    : null;
 
             const { error: insertError } = await supabase
                 .from("playtest_applications")
@@ -903,32 +906,16 @@ export function ApplyPlaytestDialog({
             setSuccess("Your application was sent successfully!");
             setMessage("");
             setOpen(false);
-       } catch (err) {
-    console.error("Playtest application error:", err);
-
-
-
-    if (err && typeof err === "object") {
-        console.error(
-            "Error details:",
-            JSON.stringify(err, Object.getOwnPropertyNames(err), 4)
-        );
-            toast.add({
-                type: "error",
-                description: `Playtest application error: ${
-                          JSON.stringify(err, Object.getOwnPropertyNames(err), 4)
-          }`,
-                priority: "high",
-            });
-
-    setError(
-        err instanceof Error
-            ? err.message
-            : "Failed to submit your application."
-    );
-} finally {
-    setSubmitting(false);
-} 
+               } catch (err) {
+            showErrorToast("Playtest application failed.");
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to submit your application."
+            );
+        } finally {
+            setSubmitting(false);
+        }
     }
 
     if (loading) {
@@ -1344,7 +1331,7 @@ async function submitHack() {
             resetForm();
         }, 1200);
     } catch (error) {
-        console.error("Hack submission failed:", error);
+        showErrorToast("Hack submission failed.");
 
         setErrorMessage(
             error instanceof Error
@@ -1360,17 +1347,11 @@ async function submitHack() {
                 .remove([pathToRemove])
                 .then(({ error: cleanupError }) => {
                     if (cleanupError) {
-                        console.error(
-                            "Could not clean up uploaded thumbnail:",
-                            cleanupError.message
-                        );
+                        showErrorToast("Could not clean up uploaded thumbnail.");
                     }
                 })
                 .catch((cleanupError) => {
-                    console.error(
-                        "Thumbnail cleanup failed:",
-                        cleanupError
-                    );
+                    showErrorToast("Thumbnail cleanup failed.");
                 });
         }
     } finally {

@@ -36,7 +36,7 @@ function HackStatusBadge({ status }: { status: string }) {
         <Badge
             variant="outline"
             className={
-                statusStyles[normalizedStatus] ??
+                statusStyles[ normalizedStatus ] ??
                 "bg-muted text-muted-foreground"
             }
         >

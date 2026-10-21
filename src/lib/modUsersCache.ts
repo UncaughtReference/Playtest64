@@ -1,3 +1,4 @@
+import { showErrorToast } from "@/lib/toast";
 const CACHE_KEY = "playtest64-mod-users";
 const CACHE_DURATION = 2 * 60 * 1000;
 
@@ -52,15 +53,15 @@ export function saveCachedModUsers<T>(
             getCacheKey(userId),
             JSON.stringify(cached)
         );
-    } catch (error) {
-        console.error("Could not cache moderator users:", error);
+    } catch {
+        showErrorToast("Could not cache moderator users.");
     }
 }
 
 export function clearCachedModUsers(userId: string): void {
     try {
         sessionStorage.removeItem(getCacheKey(userId));
-    } catch (error) {
-        console.error("Could not clear moderator users cache:", error);
+    } catch {
+        showErrorToast("Could not clear moderator users cache.");
     }
 }

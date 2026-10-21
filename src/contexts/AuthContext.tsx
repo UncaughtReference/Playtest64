@@ -1,3 +1,4 @@
+import { showErrorToast } from "@/lib/toast";
 
 import {
     createContext,
@@ -50,22 +51,23 @@ function getDiscordAccountDetails(user: User) {
                 ? discordUsername
                 : "User",
         avatarUrl:
-            typeof avatarUrl === "string"
+            typeof avatarUrl === "string" &&
+            avatarUrl.startsWith("https://")
                 ? avatarUrl
                 : null,
     };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [role, setRole] = useState<string | null>(null);
-    const [roleLoading, setRoleLoading] = useState(true);
-    const [discordUsername, setDiscordUsername] = useState<string | null>(
+    const [ user, setUser ] = useState<User | null>(null);
+    const [ loading, setLoading ] = useState(true);
+    const [ role, setRole ] = useState<string | null>(null);
+    const [ roleLoading, setRoleLoading ] = useState(true);
+    const [ discordUsername, setDiscordUsername ] = useState<string | null>(
         null
     );
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-    const [cachedIsModerator, setCachedIsModerator] = useState(false);
+    const [ avatarUrl, setAvatarUrl ] = useState<string | null>(null);
+    const [ cachedIsModerator, setCachedIsModerator ] = useState(false);
 
     const currentUserIdRef = useRef<string | null>(null);
 
@@ -102,13 +104,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             // Preserve the destination selected before Discord login.
             if (event === "SIGNED_IN" && session) {
-                const returnPath = sessionStorage.getItem(
-                    "auth-return-path"
-                );
+                let returnPath: string | null = null;
 
-                if (returnPath) {
+                try {
+                    returnPath = sessionStorage.getItem("auth-return-path");
                     sessionStorage.removeItem("auth-return-path");
+                } catch {
+                    // Continue authentication if session storage is unavailable.
+                }
 
+                if (returnPath?.startsWith("#/")) {
                     if (window.location.hash !== returnPath) {
                         window.location.hash = returnPath.slice(1);
                     }
@@ -125,10 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
 
                 if (error) {
-                    console.error(
-                        "Failed to restore auth session:",
-                        error.message
-                    );
+                    showErrorToast("Failed to restore auth session.");
 
                     currentUserIdRef.current = null;
                     setUser(null);
@@ -138,9 +140,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     currentUserIdRef.current = restoredUser?.id ?? null;
                     setUser(restoredUser);
                 }
-            } catch (error) {
+            } catch {
                 if (active) {
-                    console.error("Session restoration failed:", error);
+                    showErrorToast("Session restoration failed.");
                     currentUserIdRef.current = null;
                     setUser(null);
                 }
@@ -201,10 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
 
                 if (error) {
-                    console.error(
-                        "Could not load user role:",
-                        error.message
-                    );
+                    showErrorToast("Could not load user role.");
 
                     // Fail closed if the role cannot be verified.
                     setRole(null);
@@ -228,9 +227,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         verifiedRole === "moderator" ||
                         verifiedRole === "admin",
                 });
-            } catch (error) {
+            } catch {
                 if (active) {
-                    console.error("Account loading failed:", error);
+                    showErrorToast("Account loading failed.");
                     setRole(null);
                 }
             } finally {
@@ -245,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => {
             active = false;
         };
-    }, [user?.id]);
+    }, [ user?.id ]);
 
     const isModerator =
         !roleLoading &&
