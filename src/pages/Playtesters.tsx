@@ -120,6 +120,40 @@ export function PlaytestersList() {
 
                 return updated;
             });
+            
+            if(status == "approved") {
+                async function addXp(userId: string, amount: number): Promise<number> {
+                    const { data, error } = await supabase.rpc("add_xp", {
+                        amount: amount,
+                        target_user_id: userId,
+                    });
+
+                    if (error) {
+                        throw error;
+                    }
+
+                    return data as number;
+                } 
+
+                try {
+                    const { data, error } = await supabase
+                        .from("hacks")
+                        .select("difficulty")
+                        .eq("name", application.hack_name)
+                        .single();
+
+                    if (error) {
+                        throw error; 
+                    }
+
+                    let calculatedXp = Math.round(50 + (data.difficulty * 0.25));
+
+                    await addXp(application.applicant_id, calculatedXp);
+                } catch (error) {
+                    console.error("Failed to award XP:", error);
+                }
+            }
+
         } catch (error) {
             console.error("Failed to update application:", error);
 

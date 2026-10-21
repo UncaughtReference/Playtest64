@@ -117,7 +117,11 @@ export function ModeratorHacksGrid() {
     
 async function updateHackStatus(
     hackSlug: string,
-    status: "approved" | "declined"
+    status: "approved" | "declined",
+    starCount: number,
+    playtimeHours: number,
+    playtimeMinutes: number,
+    ownerId: string,
 ) {
     if (!user || !isModerator) {
         setError("You don't have permission to review hacks.");
@@ -162,6 +166,27 @@ async function updateHackStatus(
 
             return updated;
         });
+
+        async function addXp(userId: string, amount: number): Promise<number> {
+            const { data, error } = await supabase.rpc("add_xp", {
+                amount: amount,
+                target_user_id: userId,
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            return data as number;
+        } 
+
+        let calculatedXp = Math.round(100 + (starCount + (playtimeHours * 30 + playtimeMinutes * 0.5)));
+        
+        try {
+            await addXp(ownerId, calculatedXp);
+        } catch (error) {
+            console.error("Failed to award XP:", error);
+        }
 
         clearCachedHacks();
     } catch (err) {
@@ -229,7 +254,7 @@ async function updateHackStatus(
                         key={hack.slug}
                         hack={hack}
                         onApprove={() =>
-                            updateHackStatus(hack.slug, "approved")
+                            updateHackStatus(hack.slug, "approved", hack.star_count, hack.playtime_hours, hack.playtime_minutes, hack.owner_id)
                         }
                         onDecline={() =>
                             setHackToDecline({
@@ -280,7 +305,7 @@ async function updateHackStatus(
                                 ) {
                                     void updateHackStatus(
                                         hackToDecline.slug,
-                                        "declined"
+                                        "declined", 0, 0, 0, "" 
                                     ).then(() => {
                                         setHackToDecline(null);
                                     });

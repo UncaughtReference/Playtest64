@@ -245,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => {
             active = false;
         };
-    }, [user]);
+    }, [user?.id]);
 
     const isModerator =
         !roleLoading &&

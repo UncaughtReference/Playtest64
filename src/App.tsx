@@ -34,10 +34,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast, Toaster } from "@/components/ui/toast"
+import { ScrollArea } from "@/components/ui/scroll-area";
 //SHADCN IMPORTS----------------------------------------------------------------
 
 //LUCIDE REACT IMPORTS----------------------------------------------------------
-import { ArrowLeftIcon, Gamepad2, CirclePlus } from "lucide-react"
+import { ArrowLeftIcon, Gamepad2, CirclePlus, House, User, Monitor, Play, Shield, Users, Tags, Flame } from "lucide-react"
 //LUCIDE REACT IMPORTS----------------------------------------------------------
 
 //REACT IMPORTS-----------------------------------------------------------------
@@ -158,7 +160,8 @@ function useBanStatus(userId: string | undefined) {
 }
 
 export default function App() {
-  return (
+  return (<>
+    <Toaster/>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/account" element={<Account />} />
@@ -168,6 +171,7 @@ export default function App() {
       <Route path="/mod-users" element={<ModeratorUsers />} />
       <Route path="/:slug" element={<HackPage />} />
     </Routes>
+    </>
   );
 }
 
@@ -234,29 +238,29 @@ export function TabView({ defaultPage }: TabViewProps) {
 <div className="tabs-scroll w-full overflow-x-auto">
     <TabsList className="inline-flex w-max min-w-full justify-start">
         <TabsTrigger value="home" onClick={() => navigate("/")}>
-            Home
+            <House/>Home
         </TabsTrigger>
 
         <TabsTrigger value="account" onClick={() => navigate("/account")}>
-            Account
+            <User/>Account
         </TabsTrigger>
 
         <TabsTrigger value="my-hacks" onClick={() => navigate("/my-hacks")}>
-            My Hacks
+            <Monitor/>My Hacks
         </TabsTrigger>
 
         <TabsTrigger value="playtesters" onClick={() => navigate("/playtesters")}>
-            Playtesters
+            <Play/>Playtesters
         </TabsTrigger>
 
         {showModeratorTabs && (
             <>
                 <TabsTrigger value="mod-hacks" onClick={() => navigate("/mod-hacks")}>
-                    Mod: Hacks
+                    <Shield/>Mod: Hacks
                 </TabsTrigger>
 
                 <TabsTrigger value="mod-users" onClick={() => navigate("/mod-users")}>
-                    Mod: Users
+                    <Shield/>Mod: Users
                 </TabsTrigger>
             </>
         )}
@@ -334,7 +338,8 @@ function Hacks() {
             const { data, error: fetchError } = await supabase
                 .from("hacks")
                 .select("*")
-                .eq("status", "approved");
+                .eq("status", "approved")
+                .order("created_at", { ascending: false });
 
             if (cancelled) {
                 return;
@@ -434,11 +439,15 @@ async function deleteHack() {
     } catch (error) {
         console.error("Failed to delete hack:", error);
 
-        alert(
-            error instanceof Error
-                ? error.message
-                : "Failed to delete hack."
-        );
+        toast.add({
+            type: "error",
+            description: `Failed to delete hack: ${
+                error && typeof error === "object" && "message" in error
+                    ? String(error.message)
+                    : String(error)
+            }`,
+            priority: "high",
+        });
     } finally {
         setDeletingHackId(null);
     }
@@ -474,7 +483,8 @@ async function deleteHack() {
                 const { data, error } = await supabase
                     .from("hacks")
                     .select("*")
-                    .eq("owner_id", user.id);
+                    .eq("owner_id", user.id)
+                    .order("created_at", { ascending: false });
 
                 if (error) {
                     throw error;
@@ -541,7 +551,7 @@ async function deleteHack() {
     }
 
     if (hacks.length === 0) {
-        return <p>You haven't created any hacks yet.</p>;
+        return <p>You haven't created any hacks yet. <strong>Get creating!!</strong></p>;
     }
 
     return (
@@ -668,7 +678,7 @@ function HackPage() {
 
   return (
     <main className="animated-gradient min-h-screen">
-		<div className="max-w-4xl p-4">
+		<div className="mx-auto p-4">
 			<Header></Header>
 			
 			<Separator className="mt-2 mb-2"/>
@@ -685,7 +695,7 @@ function HackPage() {
 			<div className="mx-auto">
 			  <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
 			  <p className="mt-2">{hack.short_description}</p>
-			  <p className="mt-2">Authors: {hack.authors}</p>
+			  <div className="flex items-center"><Users className="mt-1"/><p className="mt-2 ml-1"><strong>Authors:</strong> {hack.authors}</p></div>
 
 			  {imageUrl && (
 				<img
@@ -697,10 +707,10 @@ function HackPage() {
 
 			  <p className="mt-4">{hack.long_description}</p>
 			    <div className="flex items-center">
-                    <p className="mt-2">Difficulty: {hack.difficulty}</p>
+                    <div className="flex items-center"><Flame/><p className="mt-2 ml-1"><strong>Difficulty:</strong> {hack.difficulty}</p></div>
                     <Badge className="mt-2 ml-2">{difficultyCategory}</Badge>
                 </div>
-			  <p className="">Tags: {hack.tags}</p>
+			  <div className="flex items-center"><Tags/><p className="ml-1"><strong>Tags:</strong> {hack.tags}</p></div>
 				
 			    <ApplyPlaytestDialog hackSlug={hack.slug} hackTitle={hack.name} ownerId={hack.owner_id}></ApplyPlaytestDialog>	
 
@@ -973,9 +983,13 @@ export function SubmitHackDialog({
     const [submitting, setSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
+    const [starCount, setStarCount] = useState("0");
+    const [playtimeHours, setPlaytimeHours] = useState("0");
+    const [playtimeMinutes, setPlaytimeMinutes] = useState("0");
 
     const { isBanned, checkingBan } = useBanStatus(user?.id);
 
+    const [tosOpen, setTosOpen] = useState(false);
 
     function resetForm() {
         setName("");
@@ -1056,9 +1070,13 @@ export function SubmitHackDialog({
         image.src = objectUrl;
     }
 
-        
-async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    function handleSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setTosOpen(true);
+    }
+
+
+async function submitHack() {
     setErrorMessage("");
     setSuccessMessage("");
 
@@ -1095,6 +1113,37 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         setErrorMessage("Difficulty must be a non-negative number.");
         return;
     }
+
+    const parsedStarCount = Math.round(Number(starCount));
+
+    if (
+        !Number.isFinite(parsedStarCount) ||
+        parsedStarCount < 0
+    ) {
+        setErrorMessage("Star count must be a non-negative number.");
+        return;
+    }
+
+    const parsedPlaytimeHours = Math.round(Number(playtimeHours));
+
+    if (
+        !Number.isFinite(parsedPlaytimeHours) ||
+        parsedPlaytimeHours < 0
+    ) {
+        setErrorMessage("Playtime hours must be a non-negative number.");
+        return;
+    }
+
+    const parsedPlaytimeMinutes = Math.round(Number(playtimeMinutes));
+
+    if (
+        !Number.isFinite(parsedPlaytimeMinutes) ||
+        parsedPlaytimeMinutes < 0
+    ) {
+        setErrorMessage("Playtime minutes must be a non-negative number.");
+        return;
+    }
+
 
     const normalizedSlug = slug
         .toLowerCase()
@@ -1167,6 +1216,9 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
                 tags,
                 status: "pending",
                 owner_id: user.id,
+                star_count: parsedStarCount,
+                playtime_hours: parsedPlaytimeHours,
+                playtime_minutes: parsedPlaytimeMinutes,
             });
 
         if (insertError) {
@@ -1178,6 +1230,7 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         setSuccessMessage(
             "Your hack has been submitted for moderation!"
         );
+        
 
         onSubmitted?.();
 
@@ -1483,6 +1536,60 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
                     </div>
 
                     <div className="space-y-2">
+                        <Label htmlFor="hack-star-count">Star Count</Label>
+                        <Input
+                            id="hack-star-count"
+                            type="number"
+                            value={starCount}
+                            onChange={(event) =>
+                                setStarCount(event.target.value)
+                            }
+                            min="0"
+                            step="any"
+                            required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Please don't lie!!    
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="hack-playtime-hours">Playtime (hours)</Label>
+                        <Input
+                            id="hack-playtime-hours"
+                            type="number"
+                            value={playtimeHours}
+                            onChange={(event) =>
+                                setPlaytimeHours(event.target.value)
+                            }
+                            min="0"
+                            step="any"
+                            required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Please don't lie (x2)!!    
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="hack-playtime-minutes">Playtime (minutes)</Label>
+                        <Input
+                            id="hack-playtime-minutes"
+                            type="number"
+                            value={playtimeMinutes}
+                            onChange={(event) =>
+                                setPlaytimeMinutes(event.target.value)
+                            }
+                            min="0"
+                            step="any"
+                            required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Please don't lie (x3)!!    
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
                         <Label htmlFor="hack-tags">Tags</Label>
                         <Input
                             id="hack-tags"
@@ -1531,6 +1638,92 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
                     </DialogFooter>
                 </form>
             </DialogContent>
-        </Dialog>)}</>
+        </Dialog>)}
+        <AlertDialog open={tosOpen} onOpenChange={setTosOpen}>
+    <AlertDialogContent className="max-w-lg">
+        <AlertDialogHeader>
+            <AlertDialogTitle>
+                Code of Conduct 
+            </AlertDialogTitle>
+
+            <AlertDialogDescription>
+                Please review these rules before submitting your hack.
+            </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <ScrollArea className="h-64 w-full rounded-md border p-4">
+            <div className="space-y-4 text-sm">
+                <section className="space-y-2">
+                    <h3 className="font-semibold">
+                        1. Submission Requirements
+                    </h3>
+                    <p>
+                        You must provide accurate information about your
+                        hack and ensure that your submission is complete
+                        and suitable for review.
+                    </p>
+                </section>
+
+                <section className="space-y-2">
+                    <h3 className="font-semibold">
+                        2. Ownership and Permissions
+                    </h3>
+                    <p>
+                        In case the hack isn't yours, you must have full permission from the creator of the hack in order to submit it.    
+                    </p>
+                </section>
+
+                <section className="space-y-2">
+                    <h3 className="font-semibold">
+                        3. Moderation
+                    </h3>
+                    <p>
+                        Submissions are subject to moderation. A submission
+                        may be approved, declined, or require changes before
+                        it can be published.
+                    </p>
+                </section>
+
+                <section className="space-y-2">
+                    <h3 className="font-semibold">
+                        4. Accurate Information
+                    </h3>
+                    <p>
+                        You agree to provide truthful information and not
+                        misrepresent your submission or its authorship.
+                    </p>
+                </section>
+
+                <section className="space-y-2">
+                    <h3 className="font-semibold">
+                        5. Content
+                    </h3>
+                    <p>
+                        Your hack must be human-made, AI submissions will be promptly rejected. 
+                        It shall not contain pornography, gore or other inappropriate content.
+                    </p>
+                </section>
+            </div>
+        </ScrollArea>
+
+        <AlertDialogFooter>
+            <AlertDialogCancel>
+                Cancel
+            </AlertDialogCancel>
+
+            <AlertDialogAction
+                onClick={() => {
+                    event?.preventDefault();
+                    setTosOpen(false);
+                    void submitHack();
+                }}
+            >
+                Accept & Submit
+            </AlertDialogAction>
+        </AlertDialogFooter>
+    </AlertDialogContent>
+</AlertDialog>
+        
+        </>
     );
     }

@@ -11,4 +11,7 @@ export type Hack = {
     slug: string;
     owner_id: string;
     status: string;
+    star_count: number;
+    playtime_hours: number;
+    playtime_minutes: number;
 };
