@@ -468,32 +468,32 @@ export default function DiscordLogin() {
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <Send />
-                        <p className="ml-2">{totalHackString}</p>
+                        <Send className="hidden md:block" />
+                        <p className="md:ml-2">{totalHackString}</p>
                     </div>
                 </CardContent>
             </Card>
             <Card className="min-w-0 flex-1">
                 <CardContent>
-                    <div className="flex items-center">
+                    <div className="flex items-center ">
                         <BadgeCheck className="text-green-500" />
-                        <p className="ml-2">{totalApprovedHackString}</p>
+                        <p className="md:ml-2">{totalApprovedHackString}</p>
                     </div>
                 </CardContent>
             </Card>
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <Hourglass color="#eab308" />
-                        <p className="ml-2">{totalPendingHackString}</p>
+                        <Hourglass color="#eab308" classname="hidden md:block" />
+                        <p className="md:ml-2">{totalPendingHackString}</p>
                     </div>
                 </CardContent>
             </Card>
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <X className="text-red-500" />
-                        <p className="ml-2">{totalDeclinedHackString}</p>
+                        <X className="text-red-500"  classname="hidden md:block"/>
+                        <p className="md:ml-2">{totalDeclinedHackString}</p>
                     </div>
                 </CardContent>
             </Card>

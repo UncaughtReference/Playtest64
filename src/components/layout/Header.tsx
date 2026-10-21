@@ -11,7 +11,7 @@ export default function Header() {
                 />
                 <h1 className="ml-2 text-2xl">Playtest64</h1>
             </div>
-            <div className="flex">
+            <div className="hidden md:flex md:flex-row">
                 <p className="mr-2">Made with love for the Mario</p>
                 <Heart />
             </div>

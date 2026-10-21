@@ -744,7 +744,7 @@ function HackPage() {
                     Back
                 </Button>
 
-                <div className="flex">
+                <div className="flex flex-col md:flex-row">
                     <div className="mx-auto flex-1">
                         <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
                         <p className="mt-2">{hack.short_description}</p>
@@ -764,7 +764,7 @@ function HackPage() {
                             <Badge className="mt-2 ml-2">{difficultyCategory}</Badge>
                         </div>
                         <div className="flex items-center"><Star /><p className="ml-1"><strong>Star Count:</strong> {hack.star_count}</p></div>
-                        <div className="flex items-center"><Timer /><p className="ml-1"><strong>Playtime:</strong> {hack.playtime_hours}h {hack.playtime_minutes}m</p></div>
+                        <div className="flex items-center"><Timer /><p className="ml-1"><strong>Estimated Playtime:</strong> {hack.playtime_hours}h {hack.playtime_minutes}m</p></div>
                         <div className="flex items-center"><Tags /><p className="ml-1"><strong>Tags:</strong> {hack.tags}</p></div>
 
                         <ApplyPlaytestDialog hackSlug={hack.slug} hackTitle={hack.name} ownerId={hack.owner_id}></ApplyPlaytestDialog>
@@ -772,7 +772,7 @@ function HackPage() {
                     </div>
 
                     {user?.id === hack.owner_id && (
-                        <Card className="mt-2 w-1/4">
+                        <Card className="mt-2 w-full md:w-1/4">
                             <CardHeader>
                                 <CardTitle>Playtesters</CardTitle>
                                 {playtesters.length > 0 && (<Button variant="outline" onClick={
