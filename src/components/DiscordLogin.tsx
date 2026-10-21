@@ -484,7 +484,7 @@ export default function DiscordLogin() {
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <Hourglass color="#eab308" classname="hidden md:block" />
+                        <Hourglass color="#eab308" className="hidden md:block" />
                         <p className="md:ml-2">{totalPendingHackString}</p>
                     </div>
                 </CardContent>
@@ -492,7 +492,7 @@ export default function DiscordLogin() {
             <Card className="min-w-0 flex-1">
                 <CardContent>
                     <div className="flex items-center">
-                        <X className="text-red-500"  classname="hidden md:block"/>
+                        <X className="text-red-500 hidden md:block"/>
                         <p className="md:ml-2">{totalDeclinedHackString}</p>
                     </div>
                 </CardContent>
