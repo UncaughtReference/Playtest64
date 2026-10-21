@@ -252,14 +252,14 @@ export function ModeratorUsersList() {
     }
 
     const filteredUsers = users.filter((item) => {
-        const query = search.toLowerCase();
+    const query = (search ?? "").toLowerCase();
 
-        return (
-            item.discord_username.toLowerCase().includes(query) ||
-            item.id.toLowerCase().includes(query) ||
-            item.role.toLowerCase().includes(query)
-        );
-    });
+    return (
+        (item.discord_username ?? "").toLowerCase().includes(query) ||
+        (item.id ?? "").toLowerCase().includes(query) ||
+        (item.role ?? "").toLowerCase().includes(query)
+    );
+    }); 
 
     return (
         <>

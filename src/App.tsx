@@ -1,3 +1,4 @@
+//SHADCN IMPORTS----------------------------------------------------------------
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Card,
@@ -33,36 +34,53 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+//SHADCN IMPORTS----------------------------------------------------------------
 
+//LUCIDE REACT IMPORTS----------------------------------------------------------
 import { ArrowLeftIcon, Gamepad2, CirclePlus } from "lucide-react"
+//LUCIDE REACT IMPORTS----------------------------------------------------------
 
+//REACT IMPORTS-----------------------------------------------------------------
 import { useEffect, useState, type FormEvent, type ChangeEvent  } from "react";
+
+//LIB IMPORTS-------------------------------------------------------------------
 import { supabase } from "@/lib/supabase";
-
-import { Routes, Route } from "react-router-dom";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
-
-import DiscordLogin from "@/components/DiscordLogin";
-
-import Account from "@/pages/Account";
-import MyHacks from "@/pages/MyHacks";
-import Playtesters, { PlaytestersList } from "@/pages/Playtesters";
-import ModeratorHacks, { ModeratorHacksGrid } from "@/pages/ModeratorHacks";
-import ModeratorUsers, { ModeratorUsersList } from "@/pages/ModeratorUsers";
-
-import { useAuth } from "@/contexts/AuthContext";
-
 import {
     getCachedHacks,
     saveCachedHacks,
     clearCachedHacks,
 } from "@/lib/hacksCache";
-import type { Hack } from "@/types/hack";
-import HackCard from "@/components/HackCard";
 import { clearCachedModHacks } from "@/lib/modHacksCache";
+//LIB IMPORTS-------------------------------------------------------------------
+
+//REACT ROUTER IMPORTS----------------------------------------------------------
+import { Routes, Route } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
+//REACT ROUTER IMPORTS----------------------------------------------------------
+
+//COMPONENT IMPORTS-------------------------------------------------------------
+import DiscordLogin from "@/components/DiscordLogin";
 import Header from "@/components/layout/Header";
+import HackCard from "@/components/HackCard";
+//COMPONENT IMPORTS-------------------------------------------------------------
 
+//PAGES IMPORTS-----------------------------------------------------------------
+import Account from "@/pages/Account";
+import MyHacks from "@/pages/MyHacks";
+import Playtesters, { PlaytestersList } from "@/pages/Playtesters";
+import ModeratorHacks, { ModeratorHacksGrid } from "@/pages/ModeratorHacks";
+import ModeratorUsers, { ModeratorUsersList } from "@/pages/ModeratorUsers";
+//PAGES IMPORTS-----------------------------------------------------------------
 
+//CONTEXTS IMPORTS--------------------------------------------------------------
+import { useAuth } from "@/contexts/AuthContext";
+//CONTEXTS IMPORTS--------------------------------------------------------------
+
+//TYPE IMPORTS------------------------------------------------------------------
+import type { Hack } from "@/types/hack";
+//TYPE IMPORTS------------------------------------------------------------------
+
+//TYPES-------------------------------------------------------------------------
 type ApplyPlaytestDialogProps = {
     hackSlug: string;
     hackTitle: string;
@@ -81,8 +99,11 @@ type SubmitHackDialogProps = {
 type MyHacksGridProps = {
     refreshKey: number;
 };
+//TYPES------------------------------------------------------------------------
 
+//GLOBALS----------------------------------------------------------------------
 const myHacksCache = new Map<string, Hack[]>();
+//GLOBALS----------------------------------------------------------------------
 
 function useBanStatus(userId: string | undefined) {
     const [isBanned, setIsBanned] = useState<boolean | null>(null);
