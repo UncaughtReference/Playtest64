@@ -47,8 +47,9 @@ export default function DiscordLogin() {
         }
     }, [user?.id]);
 
-    const [xp, setXp] = useState<number | null>(null);
 
+    const [xp, setXp] = useState<number | null>(null);
+    
     useEffect(() => {
         async function fetchXp() {
             if (!user?.id) {
@@ -152,6 +153,7 @@ export default function DiscordLogin() {
             console.error("Discord login failed:", error);
             toast.error(error.message);
         }
+
     };
 
     async function logout() {
@@ -210,6 +212,28 @@ export default function DiscordLogin() {
         metadata.avatar_url ??
         metadata.picture ??
         null;
+
+useEffect(() => {
+    if (!user?.id) {
+        return;
+    }
+
+    async function saveProfile() {
+        const { error } = await supabase
+            .from("user_roles")
+            .update({
+                username: displayName,
+                avatar_url: avatar,
+            })
+            .eq("user_id", user?.id);
+
+        if (error) {
+            console.error("Failed to update user profile:", error);
+        }
+    }
+
+    void saveProfile();
+}, [user?.id, displayName, avatar]);
 
     let totalHackString: string;
     if(hackCount == null) {

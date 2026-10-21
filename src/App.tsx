@@ -5,6 +5,7 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
+  CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button"
@@ -36,10 +37,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast, Toaster } from "@/components/ui/toast"
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+    Avatar,
+    AvatarFallback,
+    AvatarImage,
+} from "@/components/ui/avatar";
 //SHADCN IMPORTS----------------------------------------------------------------
 
 //LUCIDE REACT IMPORTS----------------------------------------------------------
-import { ArrowLeftIcon, Gamepad2, CirclePlus, House, User, Monitor, Play, Shield, Users, Tags, Flame } from "lucide-react"
+import { ArrowLeftIcon, Gamepad2, CirclePlus, House, User, Monitor, Play, Shield, Users, Tags, Flame, Star, Timer, Copy } from "lucide-react"
 //LUCIDE REACT IMPORTS----------------------------------------------------------
 
 //REACT IMPORTS-----------------------------------------------------------------
@@ -107,6 +113,26 @@ type MyHacksGridProps = {
 const myHacksCache = new Map<string, Hack[]>();
 //GLOBALS----------------------------------------------------------------------
 
+function showErrorToast(title: string, error: unknown) {
+    const details = error instanceof Error
+        ? error.message
+        : typeof error === "string"
+            ? error
+            : (() => {
+                try {
+                    return JSON.stringify(error) ?? String(error);
+                } catch {
+                    return String(error);
+                }
+            })();
+
+    toast.add({
+        type: "error",
+        description: `${title}: ${details}`,
+        priority: "high",
+    });
+}
+
 function useBanStatus(userId: string | undefined) {
     const [isBanned, setIsBanned] = useState<boolean | null>(null);
     const [checkingBan, setCheckingBan] = useState(true);
@@ -137,7 +163,7 @@ function useBanStatus(userId: string | undefined) {
                     setIsBanned(data === true);
                 }
             } catch (error) {
-                console.error("Could not check ban status:", error);
+                showErrorToast("Could not check ban status", error);
 
                 if (!cancelled) {
                     setIsBanned(null);
@@ -437,7 +463,6 @@ async function deleteHack() {
         clearCachedModHacks(user.id);
         setHackToDelete(null);
     } catch (error) {
-        console.error("Failed to delete hack:", error);
 
         toast.add({
             type: "error",
@@ -614,6 +639,46 @@ function HackPage() {
   const [hack, setHack] = useState<Hack | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+    
+    const [playtesters, setPlaytesters] = useState<
+    { user_id: string; username: string; avatar_url: string | null }[]
+>([]);
+
+    useEffect(() => {
+    const targetSlug = hack?.slug;
+    const ownerId = hack?.owner_id;
+    const userId = user?.id;
+
+    if (!targetSlug || !userId || ownerId !== userId) {
+        setPlaytesters([]);
+        return;
+    }
+
+    let cancelled = false;
+
+    async function fetchPlaytesters() {
+        const { data, error } = await supabase.rpc(
+            "get_hack_playtesters",
+            { target_slug: targetSlug }
+        );
+
+        if (error) {
+            showErrorToast("Failed to fetch playtester profiles", error);
+            return;
+        }
+
+        if (!cancelled) {
+            setPlaytesters(data ?? []);
+        }
+    }
+
+    void fetchPlaytesters();
+
+    return () => {
+        cancelled = true;
+    };
+}, [hack?.slug, hack?.owner_id, user?.id]);
 
   useEffect(() => {
     async function loadHack() {
@@ -675,6 +740,27 @@ function HackPage() {
     else if(Number(hack.difficulty) < 75) difficultyCategory = "Normal Kaizo";
     else if(Number(hack.difficulty) < 100) difficultyCategory = "Super Kaizo";
     else if(Number(hack.difficulty) == 100) difficultyCategory = "TAS Only";
+    
+    async function copyCredits() {
+        try {
+            let credits = "Playtesters: ";
+            for(let i = 0; i < playtesters.length; i++) {
+                if(i != playtesters.length - 1) credits += playtesters[i].username + ", ";
+                else credits += playtesters[i].username;
+            }
+            await navigator.clipboard.writeText(credits);
+        } catch (error) {
+            toast.add({
+                type: "error",
+                description: `Failed to copy credits: ${
+                    error && typeof error === "object" && "message" in error
+                        ? String(error.message)
+                        : String(error)
+                }`,
+                priority: "high",
+            });
+        }
+    }
 
   return (
     <main className="animated-gradient min-h-screen">
@@ -691,8 +777,9 @@ function HackPage() {
                 <ArrowLeftIcon />
                 Back
             </Button>	
-
-			<div className="mx-auto">
+            
+            <div className="flex">
+			<div className="mx-auto flex-1">
 			  <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
 			  <p className="mt-2">{hack.short_description}</p>
 			  <div className="flex items-center"><Users className="mt-1"/><p className="mt-2 ml-1"><strong>Authors:</strong> {hack.authors}</p></div>
@@ -710,11 +797,43 @@ function HackPage() {
                     <div className="flex items-center"><Flame/><p className="mt-2 ml-1"><strong>Difficulty:</strong> {hack.difficulty}</p></div>
                     <Badge className="mt-2 ml-2">{difficultyCategory}</Badge>
                 </div>
+                <div className="flex items-center"><Star /><p className="ml-1"><strong>Star Count:</strong> {hack.star_count}</p></div>
+                <div className="flex items-center"><Timer /><p className="ml-1"><strong>Playtime:</strong> {hack.playtime_hours}h {hack.playtime_minutes}m</p></div>
 			  <div className="flex items-center"><Tags/><p className="ml-1"><strong>Tags:</strong> {hack.tags}</p></div>
 				
 			    <ApplyPlaytestDialog hackSlug={hack.slug} hackTitle={hack.name} ownerId={hack.owner_id}></ApplyPlaytestDialog>	
 
 			</div>
+
+            {user?.id === hack.owner_id && (
+    <Card className="mt-2 w-1/4">
+            <CardHeader>
+            <CardTitle>Playtesters</CardTitle>
+            <Button variant="outline" onClick={ 
+                copyCredits
+            }><Copy/>Copy Credits</Button>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+            {playtesters.map((playtester) => (
+                <div
+                    key={playtester.user_id}
+                    className="flex items-center gap-3"
+                >
+                    <Avatar>
+                        <AvatarImage src={playtester.avatar_url ?? undefined} />
+                        <AvatarFallback>
+                            {playtester.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                    </Avatar>
+
+                    <span>{playtester.username}</span>
+                </div>
+            ))}
+        </CardContent>    
+    </Card>
+)}
+</div>
 	  </div>
     </main>
   );
@@ -807,14 +926,7 @@ export function ApplyPlaytestDialog({
             setMessage("");
             setOpen(false);
        } catch (err) {
-    console.error("Playtest application error:", err);
-
-    if (err && typeof err === "object") {
-        console.error(
-            "Error details:",
-            JSON.stringify(err, Object.getOwnPropertyNames(err), 4)
-        );
-    }
+    showErrorToast("Playtest application failed", err);
 
     setError(
         err instanceof Error
@@ -1239,7 +1351,7 @@ async function submitHack() {
             resetForm();
         }, 1200);
     } catch (error) {
-        console.error("Hack submission failed:", error);
+        showErrorToast("Hack submission failed", error);
 
         setErrorMessage(
             error instanceof Error
@@ -1255,17 +1367,14 @@ async function submitHack() {
                 .remove([pathToRemove])
                 .then(({ error: cleanupError }) => {
                     if (cleanupError) {
-                        console.error(
-                            "Could not clean up uploaded thumbnail:",
+                        showErrorToast(
+                            "Could not clean up uploaded thumbnail",
                             cleanupError.message
                         );
                     }
                 })
                 .catch((cleanupError) => {
-                    console.error(
-                        "Thumbnail cleanup failed:",
-                        cleanupError
-                    );
+                    showErrorToast("Thumbnail cleanup failed", cleanupError);
                 });
         }
     } finally {
