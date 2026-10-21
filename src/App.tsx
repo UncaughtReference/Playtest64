@@ -775,12 +775,16 @@ function HackPage() {
                         <Card className="mt-2 w-1/4">
                             <CardHeader>
                                 <CardTitle>Playtesters</CardTitle>
-                                <Button variant="outline" onClick={
+                                {playtesters.length > 0 && (<Button variant="outline" onClick={
                                     copyCredits
-                                }><Copy />Copy Credits</Button>
+                                }><Copy />Copy Credits</Button>)}
                             </CardHeader>
 
                             <CardContent className="space-y-3">
+                                {playtesters.length == 0 && (
+                                    <p>You have not approved any playtesters yet!</p>
+                                )}
+
                                 {playtesters.map((playtester) => (
                                     <div
                                         key={playtester.user_id}
