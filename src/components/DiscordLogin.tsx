@@ -11,6 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { clearCachedAccount } from "@/lib/accountCache"
 
 import { Link } from "react-router-dom"
 
@@ -184,6 +185,8 @@ export default function DiscordLogin() {
             if (error) {
                 throw error;
             }
+
+            clearCachedAccount(); 
         } catch {
             setError("Could not log out. Please try again.");
             showErrorToast("Could not log out. Please try again.");
@@ -304,18 +307,18 @@ export default function DiscordLogin() {
 
     const subLevels = [
         1,
-        5,
-        10,
-        15,
-        20,
-        25,
-        30,
-        35
+        6,
+        11,
+        16,
+        21,
+        26,
+        31,
+        36
     ];
 
     let maxXp = 50;
     let level = 1;
-    let maxXpMult = 2.25;
+    let maxXpAddition = 0;
     let subLevel = 1;
 
     if (xp != null) {
@@ -323,27 +326,12 @@ export default function DiscordLogin() {
             for (let i = 0;i < 8;i++) {
                 if (level == subLevels[ i ]) { subLevel = 1; break; }
             }
-
-            maxXp *= maxXpMult;
+            
+            maxXpAddition += 50;
+            maxXp += maxXpAddition;
             maxXp = Math.round(maxXp);
             level++;
             subLevel++;
-
-            if (level > 3) {
-                if (level > 6) {
-                    if (level > 9) {
-                        if (level > 12) {
-                            maxXpMult = 1.025;
-                        } else {
-                            maxXpMult = 1.05;
-                        }
-                    } else {
-                        maxXpMult = 1.1;
-                    }
-                } else {
-                    maxXpMult = 1.25;
-                }
-            }
         }
     }
 

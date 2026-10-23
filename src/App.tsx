@@ -46,7 +46,8 @@ import {
 //SHADCN IMPORTS----------------------------------------------------------------
 
 //LUCIDE REACT IMPORTS----------------------------------------------------------
-import { ArrowLeftIcon, Gamepad2, CirclePlus, House, User, Monitor, Play, Shield, Users, Tags, Flame, Star, Timer, Copy } from "lucide-react"
+import { ArrowLeftIcon, Gamepad2, CirclePlus, House, User, Monitor, Play, Shield, 
+    Users, Tags, Flame, Star, Timer, Copy } from "lucide-react"
 //LUCIDE REACT IMPORTS----------------------------------------------------------
 
 //REACT IMPORTS-----------------------------------------------------------------
@@ -60,6 +61,7 @@ import {
     clearCachedHacks,
 } from "@/lib/hacksCache";
 import { clearCachedModHacks } from "@/lib/modHacksCache";
+import { pushNotification } from "@/lib/notifications";
 //LIB IMPORTS-------------------------------------------------------------------
 
 //REACT ROUTER IMPORTS----------------------------------------------------------
@@ -445,7 +447,6 @@ export function MyHacksGrid({ refreshKey }: MyHacksGridProps) {
             clearCachedModHacks(user.id);
             setHackToDelete(null);
         } catch {
-
             showErrorToast("Failed to delete hack.");
         } finally {
             setDeletingHackId(null);
@@ -613,7 +614,9 @@ function HackPage() {
     const [ hack, setHack ] = useState<Hack | null>(null);
     const [ loading, setLoading ] = useState(true);
     const [ error, setError ] = useState<string | null>(null);
-    const { user } = useAuth();
+    const { user, cachedIsModerator, isModerator, roleLoading } = useAuth();
+
+    const [ownerUsername, setOwnerUsername] = useState<string | null>(null);
 
     const [ playtesters, setPlaytesters ] = useState<
         { user_id: string; username: string; avatar_url: string | null }[]
@@ -680,6 +683,34 @@ function HackPage() {
         }
     }, [ slug ]);
 
+    // Check only if mod
+    useEffect(() => {
+        if(!(cachedIsModerator || (!roleLoading && isModerator))) return;
+
+        if(!hack?.owner_id) return;
+
+        if(cachedIsModerator || (!roleLoading && isModerator)) {
+            async function fetchHackOwnerUsername() {
+                setOwnerUsername("Loading...");
+
+                const { data, error } = await supabase
+                        .from("user_roles")
+                        .select("username")
+                        .eq("user_id", hack?.owner_id);
+
+                if(error || !data || (data.length == 0) || !data[0]?.username) {
+                    if(error) console.warn(error);
+                    showErrorToast("Failed to get the hack owner!");
+                    setOwnerUsername("error");
+                }
+                
+                setOwnerUsername(data?.[0]?.username ?? null);
+            }
+
+            fetchHackOwnerUsername();
+        }
+    }, [cachedIsModerator, roleLoading, isModerator, hack?.owner_id]);
+
     if (loading) return (
         <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
             <div>
@@ -699,8 +730,47 @@ function HackPage() {
             </div>
         </main>
     );
-    if (error) return <p className="p-4">Error: {error}</p>;
-    if (!hack) return <p className="p-4">Hack not found.</p>;
+
+    if (error) return (
+        <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
+            <div>
+                <Header></Header>
+
+                <Separator className="mt-2 mb-2" />
+
+                <Button
+                    variant="outline"
+                    aria-label="Back"
+                    onClick={() => navigate(-1)}
+                >
+                    <ArrowLeftIcon />
+                    Back
+                </Button>
+                <p className="p-4">Error: {error}</p>
+            </div>
+        </main>
+    );
+    
+    if (!hack) return (
+        <main className="mx-auto p-4 flex flex-col animated-gradient min-h-screen">
+            <div>
+                <Header></Header>
+
+                <Separator className="mt-2 mb-2" />
+
+                <Button
+                    variant="outline"
+                    aria-label="Back"
+                    onClick={() => navigate(-1)}
+                >
+                    <ArrowLeftIcon />
+                    Back
+                </Button>
+                <p className="p-4">Hack not found.</p>
+            </div>
+        </main>
+
+    );
 
     const imageUrl = hack.image
         ? supabase.storage
@@ -748,6 +818,7 @@ function HackPage() {
                     <div className="mx-auto flex-1">
                         <h1 className="mt-4 text-3xl font-bold">{hack.name}</h1>
                         <p className="mt-2">{hack.short_description}</p>
+                        {(cachedIsModerator || (!roleLoading && isModerator)) && (<p className="mt-2">Submitted by: <strong>{ownerUsername}</strong></p>)}
                         <div className="flex items-center"><Users className="mt-1" /><p className="mt-2 ml-1"><strong>Authors:</strong> {hack.authors}</p></div>
 
                         {imageUrl && (
@@ -821,12 +892,16 @@ export function ApplyPlaytestDialog({
     const [ open, setOpen ] = useState(false);
     const [ error, setError ] = useState("");
     const [ success, setSuccess ] = useState("");
+    const [ rulesOpen, setRulesOpen ] = useState(false);
 
     const { isBanned, checkingBan } = useBanStatus(user?.id);
-
-    async function applyPlaytest(event: FormEvent<HTMLFormElement>) {
+    
+    function handleApply(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        setRulesOpen(true);
+    } 
 
+    async function applyPlaytest() {
         if (!user) {
             setError("Please sign in with Discord before applying.");
             return;
@@ -893,6 +968,11 @@ export function ApplyPlaytestDialog({
 
                 throw insertError;
             }
+
+            await pushNotification({
+                toUser: hack.owner_id,
+                message: `Your hack ${hack.name} has recieved a playtest application!`,
+            });
 
             setSuccess("Your application was sent successfully!");
             setMessage("");
@@ -970,7 +1050,7 @@ export function ApplyPlaytestDialog({
                 />
 
                 <DialogContent className="sm:max-w-sm">
-                    <form onSubmit={applyPlaytest}>
+                    <form onSubmit={handleApply}>
                         <DialogHeader>
                             <DialogTitle>
                                 Apply for Playtesting
@@ -1040,6 +1120,73 @@ export function ApplyPlaytestDialog({
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={rulesOpen} onOpenChange={setRulesOpen}>
+            <AlertDialogContent className="max-w-lg">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>
+                        Playtesting Rules
+                    </AlertDialogTitle>
+
+                    <AlertDialogDescription>
+                        Please review these rules before applying to playtest.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <ScrollArea className="h-64 w-full rounded-md border p-4">
+                    <div className="space-y-4 text-sm">
+                        <section className="space-y-2">
+                            <h3 className="font-semibold">
+                                1. Message
+                            </h3>
+                            <p>
+                                Your message shall not contain any mean words targeted towards the hack owner or anyone else. 
+                                Remember that users can report you. Please keep your message polite and respectful.
+                            </p>
+                        </section>
+
+                        <section className="space-y-2">
+                            <h3 className="font-semibold">
+                                2. Playtesting
+                            </h3>
+                            <p>
+                                There is a number of things that makes a playtester good, though the basics are: 
+                                <p>· concisely note down issues, as well as things you find good or interesting about the hack</p>
+                                <p>· if you find a part frustrating or unfun, note it down and take a break; otherwise you'll 
+                                have a bad mindset for the rest of the playtest</p>
+                                <p>· keep your criticism constructive; not too mean but also not too unnecessarily nice</p>
+                            </p>
+                        </section>
+
+                        <section className="space-y-2">
+                            <h3 className="font-semibold">
+                                3. Have fun!
+                            </h3>
+                            <p>
+                                Playtesting is not exactly a job, but it's also not exactly a walk in the park. 
+                                Be prepared to face problems and frustration. The most important part is to have fun!
+                            </p>
+                        </section>
+                    </div>
+                </ScrollArea>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel>
+                        Cancel
+                    </AlertDialogCancel>
+
+                    <AlertDialogAction
+                        onClick={() => {
+                            setRulesOpen(false);
+                            void applyPlaytest();
+                        }}
+                    >
+                        Accept & Apply
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
 
             {success && (
                 <p className="text-sm text-green-600" role="status">
@@ -1166,11 +1313,13 @@ export function SubmitHackDialog({
 
         if (!user) {
             setErrorMessage("You must sign in before submitting a hack.");
+            showErrorToast("You must sign in before submitting a hack.");
             return;
         }
 
         if (checkingBan) {
             setErrorMessage("Please wait while we verify your account status.");
+            showErrorToast("Please wait while we verify your account status.");
             return;
         }
 
@@ -1180,11 +1329,17 @@ export function SubmitHackDialog({
                     ? "Your account is temporarily banned and cannot upload hacks."
                     : "Could not verify your account status. Please try again."
             );
+            showErrorToast(
+                isBanned === true
+                    ? "Your account is temporarily banned and cannot upload hacks."
+                    : "Could not verify your account status. Please try again."
+            );
             return;
         }
 
         if (!thumbnail) {
             setErrorMessage("Please select a valid 4:3 thumbnail.");
+            showErrorToast("Please select a valid 4:3 thumbnail.");
             return;
         }
 
@@ -1195,6 +1350,7 @@ export function SubmitHackDialog({
             parsedDifficulty < 0
         ) {
             setErrorMessage("Difficulty must be a non-negative number.");
+            showErrorToast("Difficulty must be a non-negative number.");
             return;
         }
 
@@ -1205,6 +1361,7 @@ export function SubmitHackDialog({
             parsedStarCount < 0
         ) {
             setErrorMessage("Star count must be a non-negative number.");
+            showErrorToast("Star count must be a non-negative number.");
             return;
         }
 
@@ -1215,6 +1372,7 @@ export function SubmitHackDialog({
             parsedPlaytimeHours < 0
         ) {
             setErrorMessage("Playtime hours must be a non-negative number.");
+            showErrorToast("Playtime hours must be a non-negative number.");
             return;
         }
 
@@ -1225,6 +1383,7 @@ export function SubmitHackDialog({
             parsedPlaytimeMinutes < 0
         ) {
             setErrorMessage("Playtime minutes must be a non-negative number.");
+            showErrorToast("Playtime minutes must be a non-negative number.");
             return;
         }
 
@@ -1237,6 +1396,7 @@ export function SubmitHackDialog({
 
         if (!normalizedSlug) {
             setErrorMessage("Please enter a valid slug.");
+            showErrorToast("Please enter a valid slug.");
             return;
         }
 

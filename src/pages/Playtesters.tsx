@@ -28,6 +28,8 @@ import {
     clearCachedPlaytesters,
 } from "@/lib/playtestersCache";
 
+import { pushNotification } from "@/lib/notifications";
+
 type PlaytestApplication = {
     hack_name: string;
     owner_id: string;
@@ -120,6 +122,15 @@ export function PlaytestersList() {
                 saveCachedPlaytesters(user.id, updated);
 
                 return updated;
+            });
+
+            let message = "Error";
+            if(status === "approved") message = `Your application for ${application.hack_name} has been approved! Get playtesting!`;
+            if(status === "declined") message = `Your application for ${application.hack_name} has been declined... Sorry...`;
+                
+            await pushNotification({
+                toUser: application.applicant_id,
+                message: message,
             });
 
             if (status == "approved") {

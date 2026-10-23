@@ -29,6 +29,7 @@ import {
     getCachedModHacks,
     saveCachedModHacks,
 } from "@/lib/modHacksCache";
+import { pushNotification } from "@/lib/notifications";
 
 export default function ModeratorHacks() {
     return (
@@ -118,6 +119,7 @@ export function ModeratorHacksGrid() {
 
 
     async function updateHackStatus(
+        hackName: string,
         hackSlug: string,
         status: "approved" | "declined",
         starCount: number,
@@ -168,6 +170,15 @@ export function ModeratorHacksGrid() {
 
                 return updated;
             });
+            
+            let message = "Error";
+            if(status === "approved") message = `Your hack ${hackName} has been approved! Congrats!`;
+            else message = `Your hack ${hackName} has been declined... You may appeal this decision in our Discord server.`;
+
+            await pushNotification({
+                toUser: ownerId,
+                message: message,
+            });
 
             async function addXp(userId: string, amount: number): Promise<number> {
                 const { data, error } = await supabase.rpc("add_xp", {
@@ -184,10 +195,12 @@ export function ModeratorHacksGrid() {
 
             let calculatedXp = Math.round(100 + (starCount + (playtimeHours * 30 + playtimeMinutes * 0.5)));
 
-            try {
-                await addXp(ownerId, calculatedXp);
-            } catch {
-                showErrorToast("Failed to award XP.");
+            if(status === "approved") {
+                try {
+                    await addXp(ownerId, calculatedXp);
+                } catch {
+                    showErrorToast("Failed to award XP.");
+                }
             }
 
             clearCachedHacks();
@@ -256,7 +269,7 @@ export function ModeratorHacksGrid() {
                         key={hack.slug}
                         hack={hack}
                         onApprove={() =>
-                            updateHackStatus(hack.slug, "approved", hack.star_count, hack.playtime_hours, hack.playtime_minutes, hack.owner_id)
+                            updateHackStatus(hack.name, hack.slug, "approved", hack.star_count, hack.playtime_hours, hack.playtime_minutes, hack.owner_id)
                         }
                         onDecline={() =>
                             setHackToDecline({
@@ -306,6 +319,7 @@ export function ModeratorHacksGrid() {
                                     actionLoading === null
                                 ) {
                                     void updateHackStatus(
+                                        hackToDecline.name,
                                         hackToDecline.slug,
                                         "declined", 0, 0, 0, ""
                                     ).then(() => {
