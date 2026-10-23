@@ -1144,7 +1144,8 @@ export function ApplyPlaytestDialog({
                             </h3>
                             <p>
                                 Your message shall not contain any mean words targeted towards the hack owner or anyone else. 
-                                Remember that users can report you. Please keep your message polite and respectful.
+                                Remember that users can report you and that the administrator can view your messages. 
+                                Please keep your message polite and respectful.
                             </p>
                         </section>
 

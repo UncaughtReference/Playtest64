@@ -12,6 +12,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { clearCachedAccount } from "@/lib/accountCache"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { Link } from "react-router-dom"
 
@@ -185,6 +196,12 @@ export default function DiscordLogin() {
             setPlaytestDeclinedCount(0);
         }
     }, [ user?.id ]);
+    
+    function handleLogin() {
+        setRulesOpen(true);
+    } 
+
+    const [ rulesOpen, setRulesOpen ] = useState(false);
 
     const login = async () => {
         const returnPath = window.location.hash || "#/";
@@ -302,9 +319,9 @@ export default function DiscordLogin() {
     }
 
     if (!user) {
-        return (
+        return (<>
             <div className="space-y-2">
-                <Button onClick={login} variant="outline">
+                <Button onClick={handleLogin} variant="outline">
                     <img
                         src={`${import.meta.env.BASE_URL}assets/discord-icon.svg`}
                         alt=""
@@ -315,7 +332,75 @@ export default function DiscordLogin() {
 
                 {error && <p role="alert">{error}</p>}
             </div>
-        );
+            <AlertDialog open={rulesOpen} onOpenChange={setRulesOpen}>
+            <AlertDialogContent className="max-w-lg">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>
+                        Terms of Service    
+                    </AlertDialogTitle>
+
+                    <AlertDialogDescription>
+                        Please review these terms before signing in.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <ScrollArea className="h-64 w-full rounded-md border p-4">
+                    <div className="space-y-4 text-sm">
+                        <section className="space-y-2">
+                            <h3 className="font-semibold">
+                                1. Data Usage 
+                            </h3>
+                            <p>
+                                No private Discord account data is requested outside of your email. 
+                                Your email won't be shown on the site nor will it be viewed by moderators the administrator. 
+                                Your username and profile picture will be visible only to moderators and owners of hacks you apply to.
+                            </p>
+                        </section>
+
+                        <section className="space-y-2">
+                            <h3 className="font-semibold">
+                                2. Reporting
+                            </h3>
+                            <p>
+                                To preserve user privacy, reporting other users is done via Discord DMs (@UncaughtReference). 
+                                Please always provide a reason for your report.
+                            </p>
+                        </section>
+
+                        <section className="space-y-2">
+                            <h3 className="font-semibold">
+                                3. Other Rules 
+                            </h3>
+                            <p>
+                                Rules relevant for playtesting and hack submissions will be shown during said action.    
+                            </p>
+                        </section>
+
+                        <section className="space-y-2">
+                            <h3 className="font-semibold">
+                                Have fun hosting your hacks and/or playtesting! I hope this site will make the process of seeking playtesters a bit easier ♡     
+                            </h3>
+                        </section>
+                    </div>
+                </ScrollArea>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel>
+                        Cancel
+                    </AlertDialogCancel>
+
+                    <AlertDialogAction
+                        onClick={() => {
+                            setRulesOpen(false);
+                            void login();
+                        }}
+                    >
+                        Accept & Log in
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>);
     }
 
     let totalHackString: string;
