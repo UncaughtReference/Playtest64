@@ -539,7 +539,7 @@ export function MyHacksGrid({ refreshKey }: MyHacksGridProps) {
         return (
             <div className="p-4">
                 <p className="mb-3">
-                    Please sign in to view your playtesters!
+                    Please sign in to view your hacks!
                 </p>
                 <DiscordLogin />
             </div>
