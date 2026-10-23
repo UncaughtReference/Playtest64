@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabase";
 
 type PushNotificationParams = {
@@ -5,37 +6,71 @@ type PushNotificationParams = {
     message: string;
 };
 
+type PushNotificationResponse = {
+    success: boolean;
+    error?: string;
+    notification?: unknown;
+};
+
 export async function pushNotification({
     toUser,
     message,
 }: PushNotificationParams) {
-    if (!toUser || !message.trim()) {
+    const trimmedMessage = message.trim();
+
+    if (!toUser || !trimmedMessage) {
         return {
             success: false,
             error: "Recipient and message are required.",
         };
     }
 
-    const { data, error } = await supabase
-        .from("notifications")
-        .insert({
-            to_user: toUser,
-            message: message.trim(),
-        })
-        .select()
-        .single();
+    try {
+        const { data, error } =
+            await supabase.functions.invoke<PushNotificationResponse>(
+                "push-notification",
+                {
+                    body: {
+                        toUser,
+                        message: trimmedMessage,
+                    },
+                }
+            );
 
-    if (error) {
-        console.error("Failed to create notification:", error.message);
+            console.log("Edge Function response:", { data, error });
+
+        if (error) {
+            console.error("Failed to invoke notification function:", error.message);
+
+            return {
+                success: false,
+                error: error.message,
+            };
+        }
+
+        if (!data?.success) {
+            return {
+                success: false,
+                error: data?.error ?? "Failed to create notification.",
+            };
+        }
+
+        return {
+            success: true,
+            notification: data.notification,
+        };
+    } catch (error) {
+        const errorMessage =
+            error instanceof Error
+                ? error.message
+                : "Unexpected notification error.";
+
+        console.error(errorMessage);
 
         return {
             success: false,
-            error: error.message,
+            error: errorMessage,
         };
     }
-
-    return {
-        success: true,
-        notification: data,
-    };
 }
+

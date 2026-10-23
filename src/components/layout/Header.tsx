@@ -149,14 +149,14 @@ function NotificationsButton() {
                 
                 <Separator className="mt-2 mb-2"/>
 
-                <div className="mt-2 mr-2">
+                <div className="mr-2">
                     {loadingNotifications ? (
                         <p className="ml-4">Loading...</p>
                     ) : ( notifications?.length === 0 ? (
                         <p className="ml-4">No notifications yet!</p>
                     ) : (
                         notifications?.map((notification) => (
-                            <Card>
+                            <Card className="mt-2">
                                 <CardContent className="flex">
                                     <CircleAlert />
                                     <p className="ml-2">{notification.message}</p>
