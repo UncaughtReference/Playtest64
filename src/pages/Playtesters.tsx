@@ -125,8 +125,8 @@ export function PlaytestersList() {
             });
 
             let message = "Error";
-            if(status === "approved") message = `Your application for ${application.hack_name} has been approved! Get playtesting!`;
-            if(status === "declined") message = `Your application for ${application.hack_name} has been declined... Sorry...`;
+            if(status === "approved") message = `Your application for "${application.hack_name}" has been approved! Get playtesting!`;
+            if(status === "declined") message = `Your application for "${application.hack_name}" has been declined... Sorry...`;
                 
             await pushNotification({
                 toUser: application.applicant_id,
@@ -292,7 +292,7 @@ export function PlaytestersList() {
     }
 
     return (
-        <div className="space-y-4 p-4">
+        <div className="space-y-4">
             {error && (
                 <p className="text-sm text-muted-foreground" role="status">
                     Couldn't refresh applications. Showing cached results.
@@ -303,25 +303,25 @@ export function PlaytestersList() {
                 value={filter}
                 onValueChange={(value) => setFilter(value as Filter)}
             >
-                <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="all">
+                <TabsList className="grid w-full grid-cols-4 ">
+                    <TabsTrigger value="all"className="text-xs md:text-sm">
                         All ({applications.length})
                     </TabsTrigger>
-                    <TabsTrigger value="pending">
+                    <TabsTrigger value="pending" className="text-xs md:text-sm">
                         Pending ({
                             applications.filter(
                                 (app) => app.status?.toLowerCase() === "pending"
                             ).length
                         })
                     </TabsTrigger>
-                    <TabsTrigger value="approved">
+                    <TabsTrigger value="approved"className="text-xs md:text-sm">
                         Approved ({
                             applications.filter(
                                 (app) => app.status?.toLowerCase() === "approved"
                             ).length
                         })
                     </TabsTrigger>
-                    <TabsTrigger value="declined">
+                    <TabsTrigger value="declined"className="text-xs md:text-sm">
                         Declined ({
                             applications.filter(
                                 (app) => app.status?.toLowerCase() === "declined"

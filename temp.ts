@@ -1,236 +1,168 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const {
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    EmbedBuilder
-} = require("discord.js");
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+        "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-Deno.serve(async (req: Request) => {
+Deno.serve(async (req) => {
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
+    }
+
+    const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+            status,
+            headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+            },
+        });
+
     if (req.method !== "POST") {
-        return Response.json(
-            { error: "Method not allowed" },
-            { status: 405 }
-        );
+        return json({ error: "Method not allowed." }, 405);
     }
 
-    const expectedSecret = Deno.env.get("PLAYTEST_WEBHOOK_SECRET");
-    const suppliedSecret = req.headers.get("x-webhook-secret");
-
-    if (
-        !expectedSecret ||
-        !suppliedSecret ||
-        suppliedSecret !== expectedSecret
-    ) {
-        return Response.json(
-            { error: "Unauthorized" },
-            { status: 401 }
-        );
-    }
-
-    let payload: {
-        type?: string;
-        table?: string;
-        schema?: string;
-        record?: {
-            owner_id?: string;
-            hack_name?: string;
-            applicant_discord_username?: string;
-            applicant_id?: string;
-            message?: string;
-        };
-    };
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
+    const channelId = Deno.env.get("DISCORD_CHANNEL_ID");
 
     try {
-        payload = await req.json();
-    } catch {
-        return Response.json(
-            { error: "Invalid JSON payload" },
-            { status: 400 }
-        );
-    }
+        const authorization = req.headers.get("Authorization");
 
-    if (
-        payload.type !== "INSERT" ||
-        payload.table !== "playtest_applications" ||
-        payload.schema !== "public" ||
-        !payload.record
-    ) {
-        return Response.json(
-            { error: "Unexpected webhook payload" },
-            { status: 400 }
-        );
-    }
+        if (!authorization?.startsWith("Bearer ")) {
+            return json({ error: "Unauthorized." }, 401);
+        }
 
-    const application = payload.record;
-
-    if (!application.owner_id) {
-        return Response.json(
-            { error: "Application has no owner_id" },
-            { status: 400 }
-        );
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const botToken = Deno.env.get("DISCORD_BOT_TOKEN");
-
-    if (!supabaseUrl || !serviceRoleKey || !botToken) {
-        console.error("A required server secret is missing.");
-
-        return Response.json(
-            { error: "Server configuration error" },
-            { status: 500 }
-        );
-    }
-
-    const supabase = createClient(
-        supabaseUrl,
-        serviceRoleKey,
-        {
+        const supabase = createClient(supabaseUrl, anonKey, {
+            global: {
+                headers: { Authorization: authorization },
+            },
             auth: {
                 persistSession: false,
                 autoRefreshToken: false,
             },
-        }
-    );
-
-    const { data: owner, error: ownerError } = await supabase
-        .from("user_discord")
-        .select("discord_id")
-        .eq("user_id", application.owner_id)
-        .maybeSingle();
-
-    if (ownerError) {
-        console.error("Failed to look up playtest owner:", ownerError.message);
-
-        return Response.json(
-            { error: "Could not look up playtest owner" },
-            { status: 500 }
-        );
-    }
-
-    if (!owner?.discord_id) {
-        return Response.json(
-            { success: true, skipped: true, reason: "Owner has no saved Discord ID" }
-        );
-    }
-
-    const discordHeaders = {
-        "Authorization": `Bot ${botToken}`,
-        "Content-Type": "application/json",
-    };
-
-    try {
-        const dmResponse = await fetch(
-            "https://discord.com/api/v10/users/@me/channels",
-            {
-                method: "POST",
-                headers: discordHeaders,
-                body: JSON.stringify({
-                    recipient_id: owner.discord_id,
-                }),
-            }
-        );
-
-        if (!dmResponse.ok) {
-            const details = await dmResponse.text();
-            console.error("Discord DM channel creation failed:", dmResponse.status, details);
-
-            return Response.json(
-                { error: "Could not open a DM with the playtest owner" },
-                { status: 502 }
-            );
-        }
-
-        const dmChannel = await dmResponse.json();
-
-        const applicantName =
-            application.applicant_discord_username || "A Discord user";
-        const playtestName = application.hack_name || "a playtest";
-        const applicationMessage =
-            (application.message || "No message provided").slice(0, 1500);
-
-        const randomGreetingId = Math.floor(Math.random() * (6 - 0 + 1)) + 0;
-
-        const greetings = [
-            "Hi!",
-            "Hi there!",
-            "Hello :)",
-            "What's up?",
-            "Hope you're having a nice day!",
-            "Hiii!",
-            "Sup!",
-        ];
-
-        const messageContent = [
-            `****${greetings[randomGreetingId]}****`,
-            `New application for **${playtestName}**!`,
-            "",
-            `**Applicant:** *${applicantName}*`,
-            `**Message:** *${applicationMessage}*`,
-            "",
-            `Approve their application on *Playtest64* to give them **XP!**`,
-            `You can now message them on Discord and send them your hack! GG!`
-        ].join("\n");
-
-        const messageResponse = await fetch(
-            `https://discord.com/api/v10/channels/${dmChannel.id}/messages`,
-            {
-                method: "POST",
-                headers: discordHeaders,
-                body: JSON.stringify({
-                    content: messageContent,
-                    components: [
-                        {
-                            type: 1,
-                            components: [
-                                {
-                                    type: 2,
-                                    style: 5,
-                                    label: "View Playtesters",
-                                    url: "https://uncaughtreference.github.io/Playtest64/#/playtesters",
-                                },
-                            ],
-                        },
-                    ],
-                    allowed_mentions: {
-                        parse: [],
-                    },
-                }),
-            }
-        );
-
-        if (!messageResponse.ok) {
-            const details = await messageResponse.text();
-            console.error("Discord message send failed:", messageResponse.status, details);
-
-            return Response.json(
-                { error: "Could not send Discord notification" },
-                { status: 502 }
-            );
-        }
-
-        const sentMessage = await messageResponse.json();
-
-        console.log("Discord message accepted:", {
-            messageId: sentMessage.id,
-            channelId: sentMessage.channel_id,
-            recipientId: owner.discord_id,
         });
 
-        return Response.json({ success: true });
-    } catch (error) {
-        console.error(
-            "Discord notification request failed:",
-            error instanceof Error ? error.message : "Unknown error"
+        const {
+            data: { user },
+            error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return json({ error: "Invalid session." }, 401);
+        }
+
+        const { hackSlug, status } = await req.json();
+
+        if (
+            typeof hackSlug !== "string" ||
+            !hackSlug.trim() ||
+            !["approved", "declined"].includes(status)
+        ) {
+            return json({ error: "Invalid request." }, 400);
+        }
+
+        const admin = createClient(supabaseUrl, serviceKey, {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+            },
+        });
+
+        const { data: roleData, error: roleError } = await admin
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id);
+
+        if (roleError) {
+            console.error("Role lookup failed:", roleError);
+            return json({ error: "Could not verify permissions." }, 500);
+        }
+
+        const isModerator = roleData?.some(
+            (entry) => entry.role === "moderator" || entry.role === "admin"
         );
 
-        return Response.json(
-            { error: "Discord notification failed" },
-            { status: 502 }
-        );
+        if (!isModerator) {
+            return json({ error: "Forbidden." }, 403);
+        }
+
+        const { data: hack, error: updateError } = await admin
+            .from("hacks")
+            .update({ status })
+            .eq("slug", hackSlug.trim())
+            .eq("status", "pending")
+            .select("slug, name, status, image")
+            .maybeSingle();
+
+        if (updateError) {
+            console.error("Hack update failed:", updateError);
+            return json({ error: "Failed to update hack." }, 500);
+        }
+
+        if (!hack) {
+            return json(
+                { error: "Hack not found or no longer pending." },
+                409
+            );
+        }
+
+        let notificationSent = false;
+
+        if (status === "approved") {
+            if (!botToken || !channelId) {
+                console.error("Discord secrets are not configured.");
+            } else {
+                const discordResponse = await fetch(
+                    `https://discord.com/api/v10/channels/${channelId}/messages`,
+                    {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bot ${botToken}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            embeds: [
+                                {
+                                    title: "🎉 New hack approved!",
+                                    description:
+                                        `**${hack.name}** has been approved on Playtest64.`,
+                                    color: 0x57f287,
+                                    url:
+                                        `https://uncaughtreference.github.io/Playtest64/#/hacks/${encodeURIComponent(hack.slug)}`,
+                                    image: hack.image,
+                                },
+                            ],
+                            allowed_mentions: { parse: [] },
+                        }),
+                    }
+                );
+
+                notificationSent = discordResponse.ok;
+
+                if (!discordResponse.ok) {
+                    console.error(
+                        "Discord API error:",
+                        discordResponse.status,
+                        await discordResponse.text()
+                    );
+                }
+            }
+        }
+
+        return json({
+            hack,
+            notificationSent,
+        });
+    } catch (error) {
+        console.error("Unexpected function error:", error);
+        return json({ error: "Internal server error." }, 500);
     }
 });
 

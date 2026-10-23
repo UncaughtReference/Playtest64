@@ -81,6 +81,11 @@ export default function DiscordLogin() {
     const [ approvedCount, setApprovedCount ] = useState<number | null>(null);
     const [ pendingCount, setPendingCount ] = useState<number | null>(null);
     const [ declinedCount, setDeclinedCount ] = useState<number | null>(null);
+    
+    const [ playtestCount, setPlaytestCount ] = useState<number | null>(null);
+    const [ playtestApprovedCount, setPlaytestApprovedCount ] = useState<number | null>(null);
+    const [ playtestPendingCount, setPlaytestPendingCount ] = useState<number | null>(null);
+    const [ playtestDeclinedCount, setPlaytestDeclinedCount ] = useState<number | null>(null);
 
     useEffect(() => {
         async function countHacks() {
@@ -88,6 +93,11 @@ export default function DiscordLogin() {
             setApprovedCount(null);
             setPendingCount(null);
             setDeclinedCount(null);
+
+            setPlaytestCount(null);
+            setPlaytestApprovedCount(null);
+            setPlaytestPendingCount(null);
+            setPlaytestDeclinedCount(null);
 
             try {
                 const results = await Promise.all([
@@ -113,12 +123,36 @@ export default function DiscordLogin() {
                         .select("*", { count: "exact", head: true })
                         .eq("owner_id", user?.id)
                         .eq("status", "declined"),
+
+                    supabase
+                        .from("playtest_applications")
+                        .select("*", { count: "exact", head: true })
+                        .eq("applicant_id", user?.id),
+
+                    supabase
+                        .from("playtest_applications")
+                        .select("*", { count: "exact", head: true })
+                        .eq("applicant_id", user?.id)
+                        .eq("status", "approved"),
+
+                    supabase
+                        .from("playtest_applications")
+                        .select("*", { count: "exact", head: true })
+                        .eq("applicant_id", user?.id)
+                        .eq("status", "pending"),
+
+                    supabase
+                        .from("playtest_applications")
+                        .select("*", { count: "exact", head: true })
+                        .eq("applicant_id", user?.id)
+                        .eq("status", "declined"),
                 ]);
 
-                const [ total, approved, pending, declined ] = results;
+                const [ total, approved, pending, declined, 
+                    playtestTotal, playtestApproved, playtestPending, playtestDeclined ] = results;
 
                 if (results.some((result) => result.error)) {
-                    showErrorToast("Failed to load hack statistics.");
+                    showErrorToast("Failed to load hack & playtest statistics.");
                     return;
                 }
 
@@ -126,8 +160,14 @@ export default function DiscordLogin() {
                 setApprovedCount(approved.count ?? 0);
                 setPendingCount(pending.count ?? 0);
                 setDeclinedCount(declined.count ?? 0);
+
+                setPlaytestCount(playtestTotal.count ?? 0);
+                setPlaytestApprovedCount(playtestApproved.count ?? 0);
+                setPlaytestPendingCount(playtestPending.count ?? 0);
+                setPlaytestDeclinedCount(playtestDeclined.count ?? 0);
+
             } catch {
-                showErrorToast("Failed to load hack statistics.");
+                showErrorToast("Failed to load hack & playtest statistics.");
             }
         }
 
@@ -138,6 +178,11 @@ export default function DiscordLogin() {
             setApprovedCount(0);
             setPendingCount(0);
             setDeclinedCount(0);
+
+            setPlaytestCount(0);
+            setPlaytestApprovedCount(0);
+            setPlaytestPendingCount(0);
+            setPlaytestDeclinedCount(0);
         }
     }, [ user?.id ]);
 
@@ -305,6 +350,38 @@ export default function DiscordLogin() {
         else totalDeclinedHackString = declinedCount + " declined hacks";
     }
 
+    let totalPlaytestString: string;
+    if (playtestCount == null) {
+        totalPlaytestString = "Loading...";
+    } else {
+        if (playtestCount == 1) totalPlaytestString = playtestCount + " playtest application";
+        else totalPlaytestString = playtestCount + " playtest applications";
+    }
+
+    let totalPlaytestApprovedString: string;
+    if (playtestApprovedCount == null) {
+        totalPlaytestApprovedString = "Loading...";
+    } else {
+        if (playtestApprovedCount == 1) totalPlaytestApprovedString = playtestApprovedCount + " approved playtest application";
+        else totalPlaytestApprovedString = playtestApprovedCount + " approved playtest applications";
+    }
+
+    let totalPlaytestPendingString: string;
+    if (playtestPendingCount == null) {
+        totalPlaytestPendingString = "Loading...";
+    } else {
+        if (playtestPendingCount == 1) totalPlaytestPendingString = playtestPendingCount + " pending playtest application";
+        else totalPlaytestPendingString = playtestPendingCount + " pending playtest applications";
+    } 
+
+    let totalPlaytestDeclinedString: string;
+    if (playtestDeclinedCount == null) {
+        totalPlaytestDeclinedString = "Loading...";
+    } else {
+        if (playtestDeclinedCount == 1) totalPlaytestDeclinedString = playtestDeclinedCount + " declined playtest application";
+        else totalPlaytestDeclinedString = playtestDeclinedCount + " declined playtest applications";
+    }
+
     const subLevels = [
         1,
         6,
@@ -457,7 +534,7 @@ export default function DiscordLogin() {
                 <CardContent>
                     <div className="flex items-center">
                         <Send className="hidden md:block" />
-                        <p className="md:ml-2">{totalHackString}</p>
+                        <p className="text-xs md:ml-2 md:text-sm">{totalHackString}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -465,7 +542,7 @@ export default function DiscordLogin() {
                 <CardContent>
                     <div className="flex items-center ">
                         <BadgeCheck className="text-green-500" />
-                        <p className="md:ml-2">{totalApprovedHackString}</p>
+                        <p className="text-xs md:ml-2 md:text-sm">{totalApprovedHackString}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -473,7 +550,7 @@ export default function DiscordLogin() {
                 <CardContent>
                     <div className="flex items-center">
                         <Hourglass color="#eab308" className="hidden md:block" />
-                        <p className="md:ml-2">{totalPendingHackString}</p>
+                        <p className="text-xs md:ml-2 md:text-sm">{totalPendingHackString}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -481,7 +558,42 @@ export default function DiscordLogin() {
                 <CardContent>
                     <div className="flex items-center">
                         <X className="text-red-500 hidden md:block"/>
-                        <p className="md:ml-2">{totalDeclinedHackString}</p>
+                        <p className="text-xs md:ml-2 md:text-sm">{totalDeclinedHackString}</p>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+
+        <div className="mt-2 flex w-full gap-2">
+            <Card className="min-w-0 flex-1">
+                <CardContent>
+                    <div className="flex items-center">
+                        <Send className="hidden md:block" />
+                        <p className="text-xs md:ml-2 md:text-sm">{totalPlaytestString}</p>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card className="min-w-0 flex-1">
+                <CardContent>
+                    <div className="flex items-center ">
+                        <BadgeCheck className="text-green-500" />
+                        <p className="text-xs md:ml-2 md:text-sm">{totalPlaytestApprovedString}</p>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card className="min-w-0 flex-1">
+                <CardContent>
+                    <div className="flex items-center">
+                        <Hourglass color="#eab308" className="hidden md:block" />
+                        <p className="text-xs md:ml-2 md:text-sm">{totalPlaytestPendingString}</p>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card className="min-w-0 flex-1">
+                <CardContent>
+                    <div className="flex items-center">
+                        <X className="text-red-500 hidden md:block"/>
+                        <p className="text-xs md:ml-2 md:text-sm">{totalPlaytestDeclinedString}</p>
                     </div>
                 </CardContent>
             </Card>

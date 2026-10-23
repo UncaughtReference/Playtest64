@@ -172,8 +172,8 @@ export function ModeratorHacksGrid() {
             });
             
             let message = "Error";
-            if(status === "approved") message = `Your hack ${hackName} has been approved! Congrats!`;
-            else message = `Your hack ${hackName} has been declined... You may appeal this decision in our Discord server.`;
+            if(status === "approved") message = `Your hack "${hackName}" has been approved! Congrats!`;
+            else message = `Your hack "${hackName}" has been declined... You may appeal this decision in our Discord server.`;
 
             await pushNotification({
                 toUser: ownerId,
@@ -237,7 +237,7 @@ export function ModeratorHacksGrid() {
     }
 
     if (error && hacks.length === 0) {
-        return <p role="alert">Error: {error}</p>;
+        return <div><p role="alert">Error: {error}</p><p>Please refresh, sorry!!</p></div>;
     }
 
     if (hacks.length === 0) {

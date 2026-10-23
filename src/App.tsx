@@ -667,7 +667,10 @@ function HackPage() {
                 .from("hacks")
                 .select("*")
                 .eq("slug", slug)
+                .limit(1)
                 .maybeSingle();
+
+            console.log({data, error});
 
             if (error) {
                 setError(error.message);
@@ -971,7 +974,7 @@ export function ApplyPlaytestDialog({
 
             await pushNotification({
                 toUser: hack.owner_id,
-                message: `Your hack ${hack.name} has recieved a playtest application!`,
+                message: `Your hack "${hack.name}" has recieved a playtest application!`,
             });
 
             setSuccess("Your application was sent successfully!");
@@ -1222,6 +1225,10 @@ export function SubmitHackDialog({
 
     const [ tosOpen, setTosOpen ] = useState(false);
 
+    const [ usedSlug, setUsedSlug ] = useState<boolean | null>(null);
+
+    let normalizedSlug = "";
+
     function resetForm() {
         setName("");
         setSlug("");
@@ -1246,6 +1253,33 @@ export function SubmitHackDialog({
                 .replace(/^-+|-+$/g, "")
         );
     }
+
+    useEffect(() => {
+        async function verifySlug() {
+            setUsedSlug(null);
+
+            if(!normalizedSlug) {
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from("hacks")
+                .select("slug")
+                .eq("slug", normalizedSlug)
+                .maybeSingle();
+
+            console.log(data);
+
+            if(error) {
+                setErrorMessage("Could not fetch hacks for slug verification!");
+                showErrorToast("Could not fetch hacks for slug verification!");
+                return;
+            }
+
+            setUsedSlug(!!data);
+        }
+        verifySlug();
+    }, [ normalizedSlug ]);
 
     function handleThumbnailChange(
         event: ChangeEvent<HTMLInputElement>
@@ -1388,11 +1422,17 @@ export function SubmitHackDialog({
         }
 
 
-        const normalizedSlug = slug
+        normalizedSlug = slug
             .toLowerCase()
             .trim()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-+|-+$/g, "");
+
+        if(usedSlug) {
+            setErrorMessage("Slug is already used in another hack!");
+            showErrorToast("Slug is already used in another hack!");
+            return;
+        } 
 
         if (!normalizedSlug) {
             setErrorMessage("Please enter a valid slug.");
